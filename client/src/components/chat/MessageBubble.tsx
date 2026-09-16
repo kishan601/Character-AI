@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useSelector } from "react-redux";
 import {
   Edit3,
   Check,
@@ -6,12 +7,12 @@ import {
   Bookmark,
   Copy,
   Bot,
-  User as UserIcon,
   Sparkles,
 } from "lucide-react";
 import { Message, Character, UserPersona } from "../../api/baseApi.js";
 import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
 import { SwipeControls } from "./SwipeControls.js";
+import { RootState } from "../../store/store.js";
 
 interface MessageBubbleProps {
   message: Message;
@@ -21,6 +22,9 @@ interface MessageBubbleProps {
   isStreaming?: boolean;
   isRegeneratingThis?: boolean;
   regeneratingText?: string;
+  isDeleteMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (messageId: string) => void;
   onEdit: (messageId: string, newContent: string) => Promise<void>;
   onSwitchSwipe: (messageId: string, newIndex: number) => Promise<void>;
   onRegenerateSwipe: (messageId: string) => Promise<void>;
@@ -35,11 +39,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   isStreaming = false,
   isRegeneratingThis = false,
   regeneratingText = "",
+  isDeleteMode = false,
+  isSelected = false,
+  onToggleSelect,
   onEdit,
   onSwitchSwipe,
   onRegenerateSwipe,
   onPinMemory,
 }) => {
+  const bubbleOpacity = useSelector((state: RootState) => state.chat.bubbleOpacity ?? 70);
   const isAssistant = message.sender === "assistant";
   const swipes = message.swipes || [];
   const activeIndex = message.activeSwipeIndex ?? 0;
@@ -83,25 +91,202 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     : userPersona?.avatarUrl;
   const senderName = isAssistant ? character.name : (userPersona?.name || "You");
 
-  // USER MESSAGE: Compact bubble fitting content with zero void on the right
+  // Dynamic Opacity Styles
+  const userBubbleStyle: React.CSSProperties = bubbleOpacity === 0
+    ? {
+        backgroundColor: "transparent",
+        borderColor: "transparent",
+        backdropFilter: "none",
+        boxShadow: "none",
+      }
+    : {
+        backgroundColor: `rgba(45, 16, 82, ${(bubbleOpacity / 100) * 0.75})`,
+        borderColor: `rgba(168, 85, 247, ${(bubbleOpacity / 100) * 0.35})`,
+        backdropFilter: bubbleOpacity > 15 ? "blur(10px)" : "none",
+      };
+
+  const assistantBubbleStyle: React.CSSProperties = bubbleOpacity === 0
+    ? {
+        backgroundColor: "transparent",
+        borderColor: "transparent",
+        backdropFilter: "none",
+        boxShadow: "none",
+      }
+    : {
+        backgroundColor: `rgba(15, 17, 23, ${(bubbleOpacity / 100) * 0.65})`,
+        borderColor: `rgba(255, 255, 255, ${(bubbleOpacity / 100) * 0.08})`,
+        backdropFilter: bubbleOpacity > 15 ? "blur(10px)" : "none",
+      };
+
+  const textContrastClass = bubbleOpacity < 35 ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]" : "";
+
+  // USER MESSAGE: Compressed & compact
   if (!isAssistant) {
     return (
-      <div className="flex justify-end w-full animate-in fade-in duration-150">
-        <div className="group relative w-fit max-w-[78%] bg-brand-950/70 border border-brand-500/35 hover:border-brand-500/50 backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg transition-all">
-          <div className="flex items-center justify-between gap-4 mb-1">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-xs text-brand-300">{senderName}</span>
+      <div
+        className={`flex justify-end items-center w-full animate-in fade-in duration-150 gap-2 ${
+          isDeleteMode ? "cursor-pointer" : ""
+        }`}
+        onClick={isDeleteMode ? () => onToggleSelect?.(message.id) : undefined}
+      >
+        {/* Delete Mode Checkbox */}
+        {isDeleteMode && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect?.(message.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-4 h-4 rounded border-white/20 text-brand-500 focus:ring-0 cursor-pointer accent-brand-500 flex-shrink-0"
+          />
+        )}
+
+        <div
+          style={userBubbleStyle}
+          className={`group relative w-fit max-w-[85%] sm:max-w-[78%] border px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl transition-all ${
+            isSelected ? "ring-2 ring-red-500/80" : ""
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3 mb-0.5">
+            <div className="flex items-center gap-1.5">
+              <span className={`font-semibold text-[11px] text-brand-300 ${textContrastClass}`}>
+                {senderName}
+              </span>
             </div>
 
             {/* Quick Actions */}
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {!isDeleteMode && (
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                  title="Copy text"
+                >
+                  <Copy className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditText(currentText);
+                    setIsEditing(!isEditing);
+                  }}
+                  className="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                  title="Edit message"
+                >
+                  <Edit3 className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {isEditing ? (
+            <div className="flex flex-col gap-1.5 mt-1 w-full min-w-[260px] sm:min-w-[500px]">
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                rows={6}
+                className="w-full min-h-[120px] px-2.5 py-1.5 text-xs sm:text-sm rounded-lg bg-dark-950/90 border border-brand-500/50 text-white focus:outline-none focus:ring-1 focus:ring-brand-400 resize-y"
+              />
+              <div className="flex items-center justify-end gap-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="px-2 py-0.5 rounded-md bg-dark-800 text-slate-300 hover:bg-dark-700 text-[11px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  className="px-2.5 py-0.5 rounded-md bg-brand-600 hover:bg-brand-500 text-white font-medium text-[11px] shadow-sm"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className={textContrastClass}>
+              <MarkdownRenderer content={currentText} />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ASSISTANT MESSAGE: Compressed & compact bubble
+  return (
+    <div
+      className={`flex justify-start items-center w-full animate-in fade-in duration-150 gap-2 ${
+        isDeleteMode ? "cursor-pointer" : ""
+      }`}
+      onClick={isDeleteMode ? () => onToggleSelect?.(message.id) : undefined}
+    >
+      {/* Delete Mode Checkbox */}
+      {isDeleteMode && (
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelect?.(message.id)}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 rounded border-white/20 text-brand-500 focus:ring-0 cursor-pointer accent-brand-500 flex-shrink-0"
+        />
+      )}
+
+      <div
+        style={assistantBubbleStyle}
+        className={`group relative flex items-start gap-2 sm:gap-2.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border w-fit max-w-[88%] sm:max-w-[82%] transition-all duration-200 ${
+          isSelected ? "ring-2 ring-red-500/80" : ""
+        }`}
+      >
+        {/* Compact Avatar */}
+        <div className="flex-shrink-0 mt-0.5">
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={senderName}
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-white/10 shadow-sm ring-1 ring-black/30"
+          />
+        ) : (
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-900/60 text-purple-200 flex items-center justify-center border border-white/10 shadow-sm">
+            <Bot className="w-4 h-4" />
+          </div>
+        )}
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 min-w-0">
+        {/* Header Name */}
+        <div className="flex items-center justify-between gap-2 mb-0.5">
+          <div className="flex items-center gap-1.5">
+            <span className={`font-semibold text-xs sm:text-[13px] text-slate-100 ${textContrastClass}`}>
+              {senderName}
+            </span>
+            <span className="text-[9px] uppercase font-bold tracking-wider px-1 py-0.2 rounded bg-brand-500/20 text-brand-300 border border-brand-500/30">
+              AI
+            </span>
+          </div>
+
+          {/* Action Toolbar */}
+          {!isDeleteMode && (
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 type="button"
                 onClick={handleCopy}
                 className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-                title="Copy text"
+                title="Copy message"
               >
                 <Copy className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={handlePin}
+                className={`p-1 rounded hover:bg-white/10 transition-colors ${
+                  pinned ? "text-amber-400" : "text-slate-400 hover:text-amber-300"
+                }`}
+                title="Pin to Character Memory Bank"
+              >
+                <Bookmark className="w-3 h-3" />
               </button>
               <button
                 type="button"
@@ -115,115 +300,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <Edit3 className="w-3 h-3" />
               </button>
             </div>
-          </div>
-
-          {isEditing ? (
-            <div className="flex flex-col gap-2 mt-1 min-w-[280px]">
-              <textarea
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 text-sm rounded-xl bg-dark-950/80 border border-brand-500/50 text-white focus:outline-none focus:ring-1 focus:ring-brand-400 resize-y"
-              />
-              <div className="flex items-center justify-end gap-2 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="px-2.5 py-1 rounded-lg bg-dark-800 text-slate-300 hover:bg-dark-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveEdit}
-                  className="px-3 py-1 rounded-lg bg-brand-600 hover:bg-brand-500 text-white font-medium shadow-sm"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-          ) : (
-            <MarkdownRenderer content={currentText} className="text-slate-100" />
           )}
-        </div>
-      </div>
-    );
-  }
-
-  // ASSISTANT MESSAGE (with in-place regeneration card support)
-  return (
-    <div className="group relative flex gap-3 px-4 py-3.5 rounded-2xl bg-dark-900/60 border border-white/5 backdrop-blur-md hover:border-white/10 w-full transition-all duration-200">
-      {/* Avatar */}
-      <div className="flex-shrink-0 mt-0.5">
-        {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={senderName}
-            className="w-9 h-9 rounded-full object-cover border border-white/10 shadow-md ring-2 ring-black/30"
-          />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-purple-900/60 text-purple-200 flex items-center justify-center border border-white/10 shadow-md">
-            <Bot className="w-5 h-5" />
-          </div>
-        )}
-      </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 min-w-0">
-        {/* Header Name */}
-        <div className="flex items-center justify-between gap-2 mb-1.5">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm text-slate-100">{senderName}</span>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300 border border-brand-500/30">
-              AI
-            </span>
-          </div>
-
-          {/* Action Toolbar */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-              title="Copy message"
-            >
-              <Copy className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={handlePin}
-              className={`p-1 rounded hover:bg-white/10 transition-colors ${
-                pinned ? "text-amber-400" : "text-slate-400 hover:text-amber-300"
-              }`}
-              title="Pin to Character Memory Bank"
-            >
-              <Bookmark className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditText(currentText);
-                setIsEditing(!isEditing);
-              }}
-              className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-              title="Edit message"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-            </button>
-          </div>
         </div>
 
         {/* In-Place Regeneration Card */}
         {isRegeneratingThis ? (
-          <div className="py-2 space-y-2">
-            <div className="flex items-center gap-2 text-brand-300 text-xs font-mono animate-pulse">
-              <Sparkles className="w-3.5 h-3.5 animate-spin text-brand-400" />
+          <div className="py-1 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-brand-300 text-[11px] font-mono animate-pulse">
+              <Sparkles className="w-3 h-3 animate-spin text-brand-400" />
               <span>Thinking of an alternate response...</span>
             </div>
             {regeneratingText ? (
-              <MarkdownRenderer content={regeneratingText} />
+              <div className={textContrastClass}>
+                <MarkdownRenderer content={regeneratingText} />
+              </div>
             ) : (
-              <div className="h-12 flex items-center gap-1.5 text-slate-500">
+              <div className="h-8 flex items-center gap-1 text-slate-500">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce" />
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce [animation-delay:0.2s]" />
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce [animation-delay:0.4s]" />
@@ -231,42 +323,39 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             )}
           </div>
         ) : isEditing ? (
-          <div className="flex flex-col gap-2 mt-2">
+          <div className="flex flex-col gap-1.5 mt-1 w-full min-w-[260px] sm:min-w-[500px]">
             <textarea
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 text-sm rounded-xl bg-dark-950/80 border border-brand-500/50 text-white focus:outline-none focus:ring-1 focus:ring-brand-400 resize-y"
+              rows={6}
+              className="w-full min-h-[120px] px-2.5 py-1.5 text-xs sm:text-sm rounded-lg bg-dark-950/90 border border-brand-500/50 text-white focus:outline-none focus:ring-1 focus:ring-brand-400 resize-y"
             />
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-amber-400 text-[11px]">
-                ⚠️ Editing will branch context & soft-delete subsequent replies.
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="px-2.5 py-1 rounded-lg bg-dark-800 hover:bg-dark-700 text-slate-300 flex items-center gap-1 transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" /> Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveEdit}
-                  className="px-3 py-1 rounded-lg bg-brand-600 hover:bg-brand-500 text-white font-medium flex items-center gap-1 transition-colors shadow-sm"
-                >
-                  <Check className="w-3.5 h-3.5" /> Save
-                </button>
-              </div>
+            <div className="flex items-center justify-end gap-1.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="px-2 py-0.5 rounded-md bg-dark-800 hover:bg-dark-700 text-slate-300 flex items-center gap-1 transition-colors text-[11px]"
+              >
+                <X className="w-3 h-3" /> Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                className="px-2.5 py-0.5 rounded-md bg-brand-600 hover:bg-brand-500 text-white font-medium flex items-center gap-1 transition-colors shadow-sm text-[11px]"
+              >
+                <Check className="w-3 h-3" /> Save
+              </button>
             </div>
           </div>
         ) : (
-          <MarkdownRenderer content={currentText} />
+          <div className={textContrastClass}>
+            <MarkdownRenderer content={currentText} />
+          </div>
         )}
 
         {/* Swipe Controls */}
-        {!isEditing && !isRegeneratingThis && (
-          <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/5">
+        {!isEditing && !isRegeneratingThis && !isDeleteMode && (
+          <div className="flex items-center justify-between mt-1.5 pt-1 border-t border-white/5">
             <SwipeControls
               currentIndex={activeIndex}
               totalSwipes={Math.max(swipes.length, 1)}
@@ -277,10 +366,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               isStreaming={isStreaming}
             />
 
-            {copied && <span className="text-[11px] text-emerald-400">Copied!</span>}
-            {pinned && <span className="text-[11px] text-amber-300">Pinned to Memory!</span>}
+            {copied && <span className="text-[10px] text-emerald-400">Copied!</span>}
+            {pinned && <span className="text-[10px] text-amber-300">Pinned to Memory!</span>}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

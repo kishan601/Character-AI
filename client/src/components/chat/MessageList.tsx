@@ -1,8 +1,10 @@
 import React, { useEffect, useRef } from "react";
+import { useSelector } from "react-redux";
 import { Message, Character, UserPersona } from "../../api/baseApi.js";
 import { MessageBubble } from "./MessageBubble.js";
 import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
 import { Bot, Sparkles } from "lucide-react";
+import { RootState } from "../../store/store.js";
 
 interface MessageListProps {
   messages: Message[];
@@ -12,6 +14,9 @@ interface MessageListProps {
   isStreaming: boolean;
   optimisticUserMessage?: string | null;
   regeneratingMessageId?: string | null;
+  isDeleteMode?: boolean;
+  selectedMessageIds?: Set<string>;
+  onToggleSelect?: (messageId: string) => void;
   onEdit: (messageId: string, newContent: string) => Promise<void>;
   onSwitchSwipe: (messageId: string, newIndex: number) => Promise<void>;
   onRegenerateSwipe: (messageId: string) => Promise<void>;
@@ -26,40 +31,81 @@ export const MessageList: React.FC<MessageListProps> = ({
   isStreaming,
   optimisticUserMessage,
   regeneratingMessageId,
+  isDeleteMode = false,
+  selectedMessageIds,
+  onToggleSelect,
   onEdit,
   onSwitchSwipe,
   onRegenerateSwipe,
   onPinMemory,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const bubbleOpacity = useSelector((state: RootState) => state.chat.bubbleOpacity ?? 70);
 
-  // Auto-scroll on new message, optimistic insertion, or during streaming
+  // Auto-scroll ONLY inside the chat container, NEVER scrolling the outer window
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (containerRef.current) {
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior: isStreaming ? "auto" : "smooth",
+      });
+    }
   }, [messages, streamingText, isStreaming, optimisticUserMessage]);
 
+  const userBubbleStyle: React.CSSProperties = bubbleOpacity === 0
+    ? {
+        backgroundColor: "transparent",
+        borderColor: "transparent",
+        backdropFilter: "none",
+        boxShadow: "none",
+      }
+    : {
+        backgroundColor: `rgba(45, 16, 82, ${(bubbleOpacity / 100) * 0.75})`,
+        borderColor: `rgba(168, 85, 247, ${(bubbleOpacity / 100) * 0.35})`,
+        backdropFilter: bubbleOpacity > 15 ? "blur(10px)" : "none",
+      };
+
+  const assistantBubbleStyle: React.CSSProperties = bubbleOpacity === 0
+    ? {
+        backgroundColor: "transparent",
+        borderColor: "transparent",
+        backdropFilter: "none",
+        boxShadow: "none",
+      }
+    : {
+        backgroundColor: `rgba(15, 17, 23, ${(bubbleOpacity / 100) * 0.65})`,
+        borderColor: `rgba(255, 255, 255, ${(bubbleOpacity / 100) * 0.08})`,
+        backdropFilter: bubbleOpacity > 15 ? "blur(10px)" : "none",
+      };
+
+  const textContrastClass = bubbleOpacity < 35 ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]" : "";
+
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 max-w-4xl mx-auto w-full">
+    <div
+      ref={containerRef}
+      className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 sm:py-4 space-y-2 sm:space-y-2.5 max-w-4xl mx-auto w-full"
+    >
       {/* Welcome Header */}
       {messages.length <= 1 && (
-        <div className="flex flex-col items-center text-center py-6 px-4 rounded-3xl bg-dark-900/40 border border-white/5 backdrop-blur-md mb-6">
+        <div className="flex flex-col items-center text-center py-4 sm:py-5 px-3 sm:px-4 rounded-2xl sm:rounded-3xl bg-dark-900/40 border border-white/5 backdrop-blur-md mb-3 sm:mb-4">
           {character.avatarUrl ? (
             <img
               src={character.avatarUrl}
               alt={character.name}
-              className="w-20 h-20 rounded-full object-cover border-2 border-brand-500/40 shadow-xl mb-3 ring-4 ring-black/40"
+              className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-brand-500/40 shadow-xl mb-2 ring-2 ring-black/40"
             />
           ) : (
-            <div className="w-20 h-20 rounded-full bg-brand-900/50 flex items-center justify-center border-2 border-brand-500/30 text-brand-300 shadow-xl mb-3">
-              <Bot className="w-10 h-10" />
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-brand-900/50 flex items-center justify-center border-2 border-brand-500/30 text-brand-300 shadow-xl mb-2">
+              <Bot className="w-7 h-7 sm:w-8 sm:h-8" />
             </div>
           )}
-          <h2 className="text-xl font-bold text-white tracking-tight">{character.name}</h2>
+          <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">{character.name}</h2>
           {character.tagline && (
-            <p className="text-sm text-brand-300 font-medium mt-1">{character.tagline}</p>
+            <p className="text-xs text-brand-300 font-medium mt-0.5">{character.tagline}</p>
           )}
           {character.description && (
-            <p className="text-xs text-slate-400 max-w-md mt-2 line-clamp-3">
+            <p className="text-[11px] text-slate-400 max-w-md mt-1.5 line-clamp-2">
               {character.description}
             </p>
           )}
@@ -82,6 +128,9 @@ export const MessageList: React.FC<MessageListProps> = ({
             isStreaming={isStreaming}
             isRegeneratingThis={isRegenThis}
             regeneratingText={isRegenThis ? streamingText : ""}
+            isDeleteMode={isDeleteMode}
+            isSelected={selectedMessageIds?.has(msg.id)}
+            onToggleSelect={onToggleSelect}
             onEdit={onEdit}
             onSwitchSwipe={onSwitchSwipe}
             onRegenerateSwipe={onRegenerateSwipe}
@@ -93,48 +142,62 @@ export const MessageList: React.FC<MessageListProps> = ({
       {/* Optimistic User Message (Shown INSTANTLY on hitting send) */}
       {optimisticUserMessage && (
         <div className="flex justify-end w-full animate-in fade-in slide-in-from-bottom-2 duration-150">
-          <div className="w-fit max-w-[78%] bg-brand-950/70 border border-brand-500/35 backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg">
-            <span className="font-semibold text-xs text-brand-300 block mb-1">
+          <div
+            style={userBubbleStyle}
+            className="w-fit max-w-[85%] sm:max-w-[78%] border px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl shadow-lg"
+          >
+            <span className={`font-semibold text-[11px] text-brand-300 block mb-0.5 ${textContrastClass}`}>
               {userPersona?.name || "You"}
             </span>
-            <MarkdownRenderer content={optimisticUserMessage} className="text-slate-100" />
+            <div className={textContrastClass}>
+              <MarkdownRenderer content={optimisticUserMessage} />
+            </div>
           </div>
         </div>
       )}
 
-      {/* Real-time Streaming Bubble for NEW turn (only when not regenerating an existing message in-place) */}
+      {/* Real-time Streaming Bubble for NEW turn */}
       {isStreaming && !regeneratingMessageId && (
-        <div className="flex gap-3 px-4 py-3.5 rounded-2xl bg-dark-900/70 border border-brand-500/20 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="flex-shrink-0 mt-0.5">
-            {character.avatarUrl ? (
-              <img
-                src={character.avatarUrl}
-                alt={character.name}
-                className="w-9 h-9 rounded-full object-cover border border-white/10 shadow-md ring-2 ring-brand-500/30 animate-pulse"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-brand-900/60 flex items-center justify-center text-brand-300 border border-white/10 shadow-md">
-                <Bot className="w-5 h-5" />
-              </div>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="font-semibold text-sm text-slate-100">{character.name}</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300 border border-brand-500/30 flex items-center gap-1">
-                <Sparkles className="w-2.5 h-2.5 animate-spin" /> Generating...
-              </span>
+        <div className="flex justify-start w-full animate-in fade-in duration-150">
+          <div
+            style={assistantBubbleStyle}
+            className="flex items-start gap-2 sm:gap-2.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border w-fit max-w-[88%] sm:max-w-[82%]"
+          >
+            <div className="flex-shrink-0 mt-0.5">
+              {character.avatarUrl ? (
+                <img
+                  src={character.avatarUrl}
+                  alt={character.name}
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-white/10 shadow-sm ring-1 ring-brand-500/30 animate-pulse"
+                />
+              ) : (
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-900/60 flex items-center justify-center text-brand-300 border border-white/10 shadow-sm">
+                  <Bot className="w-4 h-4" />
+                </div>
+              )}
             </div>
-            {streamingText ? (
-              <MarkdownRenderer content={streamingText} />
-            ) : (
-              <div className="flex items-center gap-1.5 py-2 text-slate-400 text-xs">
-                <span className="w-2 h-2 rounded-full bg-brand-400 animate-bounce" />
-                <span className="w-2 h-2 rounded-full bg-brand-400 animate-bounce [animation-delay:0.2s]" />
-                <span className="w-2 h-2 rounded-full bg-brand-400 animate-bounce [animation-delay:0.4s]" />
-                <span className="ml-2 font-mono text-[11px] text-brand-300">Formulating response...</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className={`font-semibold text-xs sm:text-[13px] text-slate-100 ${textContrastClass}`}>
+                  {character.name}
+                </span>
+                <span className="text-[9px] uppercase font-bold tracking-wider px-1 py-0.2 rounded bg-brand-500/20 text-brand-300 border border-brand-500/30 flex items-center gap-1">
+                  <Sparkles className="w-2.5 h-2.5 animate-spin" /> Generating...
+                </span>
               </div>
-            )}
+              {streamingText ? (
+                <div className={textContrastClass}>
+                  <MarkdownRenderer content={streamingText} />
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 py-1 text-slate-400 text-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce [animation-delay:0.2s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce [animation-delay:0.4s]" />
+                  <span className="ml-1.5 font-mono text-[10px] text-brand-300">Formulating response...</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
