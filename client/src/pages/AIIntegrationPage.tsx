@@ -33,6 +33,58 @@ export const AIIntegrationPage: React.FC = () => {
   const [isTesting, setIsTesting] = useState(false);
   const [testStatus, setTestStatus] = useState<"idle" | "ready" | "error">("idle");
 
+  // Debug console state
+  const [debugLog, setDebugLog] = useState<Array<{ ts: string; label: string; ok: boolean; body: string }>>([]);
+  const [isDebugging, setIsDebugging] = useState(false);
+
+  const addLog = (label: string, ok: boolean, body: string) => {
+    setDebugLog(prev => [{ ts: new Date().toISOString().slice(11, 23), label, ok, body }, ...prev.slice(0, 19)]);
+  };
+
+  const runDiagnostics = async () => {
+    if (isDebugging) return;
+    setIsDebugging(true);
+    setDebugLog([]);
+    const base = getApiBaseUrl();
+
+    // 1. Test backend health
+    try {
+      const r = await fetch(`${base}/health`, { method: "GET" });
+      const txt = await r.text();
+      addLog("Backend /health", r.ok, txt);
+    } catch (e: any) {
+      addLog("Backend /health", false, e.message);
+    }
+
+    // 2. Test LM Studio proxy
+    try {
+      const r = await fetch(`${base}/generate/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aiConfig: { aiProvider: provider, aiEndpoint: endpoint, aiApiKey: apiKey, aiModel: model } })
+      });
+      const txt = await r.text();
+      addLog(`LM Studio via backend`, r.ok, txt);
+    } catch (e: any) {
+      addLog("LM Studio via backend", false, e.message);
+    }
+
+    // 3. Test raw endpoint from phone directly (will likely fail due to CORS but useful for info)
+    try {
+      const r = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: model || "local-model", messages: [{ role: "user", content: "ping" }], max_tokens: 3 })
+      });
+      const txt = await r.text();
+      addLog("Direct LM Studio (phone→PC)", r.ok, txt.slice(0, 200));
+    } catch (e: any) {
+      addLog("Direct LM Studio (phone→PC)", false, e.message);
+    }
+
+    setIsDebugging(false);
+  };
+
   const openModal = (modalName: typeof activeModal, currentValue: string) => {
     setEditValue(currentValue);
     setActiveModal(modalName);
@@ -192,6 +244,53 @@ export const AIIntegrationPage: React.FC = () => {
           </div>
 
         </div>
+
+        {/* Debug Console */}
+        <div className="mt-6">
+          <div className="text-[14px] font-medium text-[#c58245] mb-2.5 ml-0.5">Network Diagnostics</div>
+          <div className="bg-[#1f2223] rounded-[28px] overflow-hidden shadow-lg border border-white/[0.03]">
+            <button
+              onClick={runDiagnostics}
+              disabled={isDebugging}
+              className={`w-full flex items-center gap-4 p-[18px] hover:bg-white/5 active:bg-white/10 transition-colors ${isDebugging ? "opacity-60" : ""}`}
+            >
+              <div className={`w-[46px] h-[46px] flex-shrink-0 rounded-[18px] flex items-center justify-center text-[#2a1708] ${isDebugging ? "bg-amber-400" : "bg-[#f8b76c]"}`}>
+                {isDebugging
+                  ? <div className="w-6 h-6 border-2 border-[#2a1708] border-t-transparent rounded-full animate-spin" />
+                  : <span className="text-[22px]">🔬</span>}
+              </div>
+              <div className="flex flex-col items-start">
+                <span className="text-[16px] font-medium text-[#f4f3f0]">Run Diagnostics</span>
+                <span className="text-[13px] text-[#8e9699]">
+                  {isDebugging ? "Testing all hops..." : "Backend → LM Studio → Direct"}
+                </span>
+              </div>
+            </button>
+
+            {debugLog.length > 0 && (
+              <div className="border-t border-white/[0.04] px-4 py-3 space-y-2 max-h-[60vh] overflow-y-auto">
+                {debugLog.map((entry, i) => (
+                  <div key={i} className={`rounded-[14px] p-3 text-[12px] font-mono border ${
+                    entry.ok
+                      ? "bg-emerald-950/50 border-emerald-600/20"
+                      : "bg-red-950/50 border-red-600/20"
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[11px] text-slate-500">{entry.ts}</span>
+                      <span className={`font-bold ${entry.ok ? "text-emerald-400" : "text-red-400"}`}>
+                        {entry.ok ? "✓" : "✗"} {entry.label}
+                      </span>
+                    </div>
+                    <pre className={`whitespace-pre-wrap break-all text-[11px] leading-relaxed ${
+                      entry.ok ? "text-emerald-300" : "text-red-300"
+                    }`}>{entry.body}</pre>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
       </main>
 
       {/* MODALS */}
