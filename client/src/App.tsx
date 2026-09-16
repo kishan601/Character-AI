@@ -21,7 +21,7 @@ export const App: React.FC = () => {
   return (
     <Provider store={store}>
       <BrowserRouter>
-        <div className="flex h-full w-screen overflow-hidden bg-dark-950 text-slate-100 font-sans pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+        <div className="flex h-full w-screen overflow-hidden bg-dark-950 text-slate-100 font-sans">
           <Sidebar />
           <div className="flex-1 flex flex-col h-full overflow-hidden relative">
             <Routes>

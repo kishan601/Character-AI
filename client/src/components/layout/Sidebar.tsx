@@ -115,7 +115,7 @@ export const Sidebar: React.FC = () => {
 
       {/* Sidebar Panel with Smooth Desktop & Mobile Collapse */}
       <aside
-        className={`fixed md:relative inset-y-0 left-0 z-40 glass-panel border-r border-white/10 flex flex-col transition-all duration-300 ease-in-out bg-dark-950/95 flex-shrink-0 ${
+        className={`fixed md:relative inset-y-0 left-0 z-40 glass-panel border-r border-white/10 flex flex-col transition-all duration-300 ease-in-out bg-dark-950/95 flex-shrink-0 pt-[env(safe-area-inset-top)] ${
           sidebarOpen
             ? "w-64 translate-x-0 opacity-100"
             : "w-0 -translate-x-full md:w-0 md:translate-x-0 opacity-0 pointer-events-none md:border-r-0 overflow-hidden"

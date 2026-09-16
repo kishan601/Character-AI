@@ -115,7 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header
-      className={`relative z-40 w-full h-14 sm:h-16 flex-shrink-0 border-b transition-all duration-300 flex items-center justify-between px-3 sm:px-6 ${
+      className={`relative z-40 w-full h-14 sm:h-16 flex-shrink-0 border-b transition-all duration-300 flex items-center justify-between px-3 sm:px-6 pt-[env(safe-area-inset-top)] ${
         zenMode
           ? "opacity-0 pointer-events-none -translate-y-4"
           : "opacity-100 glass-panel border-white/10 shadow-lg"
