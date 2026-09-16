@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { UploadCloud, Image as ImageIcon, Crop, Loader2, Sparkles } from "lucide-react";
 import { ImageCropModal } from "./ImageCropModal.js";
+import { getApiBaseUrl } from "../../config.js";
 
 interface ImageUploadProps {
   type: "avatar" | "wallpaper";
@@ -54,7 +55,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     formData.append("image", fileOrBlob, fileName);
 
     try {
-      const endpoint = type === "avatar" ? "/api/upload/avatar" : "/api/upload/wallpaper";
+      const endpoint = type === "avatar" ? `${getApiBaseUrl()}/upload/avatar` : `${getApiBaseUrl()}/upload/wallpaper`;
       const res = await fetch(endpoint, {
         method: "POST",
         body: formData,

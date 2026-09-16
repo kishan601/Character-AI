@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useDispatch } from "react-redux";
 import { baseApi } from "../api/baseApi.js";
+import { getApiBaseUrl } from "../config";
 import { AppDispatch } from "../store/store.js";
 
 interface UseStreamChatOptions {
@@ -44,7 +45,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
       abortControllerRef.current = controller;
 
       try {
-        const response = await fetch("/api/generate", {
+        const response = await fetch(`${getApiBaseUrl()}/generate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -166,7 +167,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
       abortControllerRef.current = controller;
 
       try {
-        const response = await fetch("/api/generate", {
+        const response = await fetch(`${getApiBaseUrl()}/generate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -268,7 +269,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
       abortControllerRef.current = controller;
 
       try {
-        const response = await fetch("/api/generate/regenerate", {
+        const response = await fetch(`${getApiBaseUrl()}/generate/regenerate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

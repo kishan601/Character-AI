@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { getApiBaseUrl } from "../config";
 
 export interface Character {
   id: string;
@@ -83,9 +84,14 @@ export interface LMStudioHealth {
   error?: string;
 }
 
+const dynamicBaseQuery = async (args: any, api: any, extraOptions: any) => {
+  const rawBaseQuery = fetchBaseQuery({ baseUrl: getApiBaseUrl() });
+  return rawBaseQuery(args, api, extraOptions);
+};
+
 export const baseApi = createApi({
   reducerPath: "api",
-  baseQuery: fetchBaseQuery({ baseUrl: "/api" }),
+  baseQuery: dynamicBaseQuery,
   keepUnusedDataFor: 120,
   refetchOnMountOrArgChange: 30,
   tagTypes: ["Characters", "Character", "Personas", "Sessions", "Session", "Messages", "Memories", "Health"],
