@@ -5,6 +5,12 @@ export interface Character {
   name: string;
   tagline?: string | null;
   description?: string | null;
+  persona?: string | null;
+  gender?: string | null;
+  pronounSubject?: string | null;
+  pronounObject?: string | null;
+  pronounPossessive?: string | null;
+  pronounDeterminer?: string | null;
   greeting: string;
   systemPrompt: string;
   exampleDialogue?: string | null;
@@ -21,6 +27,11 @@ export interface UserPersona {
   id: string;
   name: string;
   description: string;
+  gender?: string | null;
+  pronounSubject?: string | null;
+  pronounObject?: string | null;
+  pronounPossessive?: string | null;
+  pronounDeterminer?: string | null;
   avatarUrl?: string | null;
   isDefault: boolean;
   createdAt: string;
@@ -108,7 +119,7 @@ export const baseApi = createApi({
         method: "PUT",
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => ["Characters", { type: "Character", id }],
+      invalidatesTags: (result, error, { id }) => ["Characters", { type: "Character", id }, "Sessions"],
     }),
     deleteCharacter: builder.mutation<{ success: boolean }, string>({
       query: (id) => ({
@@ -247,6 +258,28 @@ export const baseApi = createApi({
       }),
       invalidatesTags: ["Messages"],
     }),
+    batchDeleteMessages: builder.mutation<{ success: boolean; count: number }, { messageIds: string[]; sessionId: string }>({
+      query: ({ messageIds }) => ({
+        url: "/messages/batch-delete",
+        method: "POST",
+        body: { messageIds },
+      }),
+      async onQueryStarted({ messageIds, sessionId }, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          baseApi.util.updateQueryData("getSession", sessionId, (draft) => {
+            if (draft.messages) {
+              draft.messages = draft.messages.filter((m) => !messageIds.includes(m.id));
+            }
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
+      invalidatesTags: ["Messages", "Session"],
+    }),
 
     // Memories
     getMemories: builder.query<PinnedMemory[], { characterId: string; sessionId?: string }>({
@@ -295,6 +328,7 @@ export const {
   useGetMessagesQuery,
   useEditMessageMutation,
   useSwitchSwipeMutation,
+  useBatchDeleteMessagesMutation,
   useGetMemoriesQuery,
   usePinMemoryMutation,
   useUnpinMemoryMutation,
