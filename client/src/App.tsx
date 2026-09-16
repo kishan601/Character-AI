@@ -11,10 +11,17 @@ import { SettingsPage } from "./pages/SettingsPage.js";
 import { GlobalPersonaModal } from "./components/personas/GlobalPersonaModal.js";
 
 export const App: React.FC = () => {
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+  }, []);
+
   return (
     <Provider store={store}>
       <BrowserRouter>
-        <div className="flex h-screen w-screen overflow-hidden bg-dark-950 text-slate-100 font-sans">
+        <div className="flex h-full w-screen overflow-hidden bg-dark-950 text-slate-100 font-sans">
           <Sidebar />
           <div className="flex-1 flex flex-col h-full overflow-hidden relative">
             <Routes>
