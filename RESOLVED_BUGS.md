@@ -162,3 +162,85 @@
 * **Client Production Build:** `tsc && vite build` completes with **0 errors**.
 * **Backend:** Running stably on port 3001 with active observability logs.
 * **Database:** In sync on Neon PostgreSQL with composite indices and clean cascading deletions.
+
+---
+
+# Mobile & AI Integration Session — Bug Fixes
+**Date:** September 16, 2026  
+**Status:** All 9 Bugs Resolved  
+**Focus:** Android APK connectivity, AI Integration settings UI, WebView security policies
+
+---
+
+## 6. Android / Capacitor
+
+### Bug 18: Android WebView Mixed Content Blocking (Root Cause of ALL Connection Failures)
+* **The Issue:** Every API request from the installed APK showed `blocked:mixed-content` in DevTools — characters, sessions, health, and chat generation all silently failed. The app appeared completely broken.
+* **Root Cause:** Capacitor serves the app from `http://localhost` inside Android WebView. Android treats `http://localhost` as a **secure origin** (equivalent to HTTPS on desktop). Any outbound `fetch()` to `http://192.168.x.x:3001` (plain HTTP to an external LAN IP) was classified as mixed content and blocked at the OS level — before even touching the network. This is governed by Android's `MIXED_CONTENT_COMPATIBILITY_MODE` default.
+* **The Fix:** Added `android.allowMixedContent: true` to `client/capacitor.config.ts`, setting the WebView to `MIXED_CONTENT_ALWAYS_ALLOW` mode — equivalent to a regular browser's behavior.
+* **Commit:** `833351b`
+
+### Bug 19: Windows Firewall Blocking Port 3001
+* **The Issue:** The Android phone could not reach the Node.js backend at `192.168.29.240:3001` — all connection attempts timed out silently even though both devices were on the same Wi-Fi.
+* **Root Cause:** Windows Firewall had no inbound rule for TCP port 3001. All LAN connection attempts from the phone were dropped at the OS firewall, even though the Node.js server was correctly bound to `0.0.0.0` (all interfaces).
+* **The Fix:** Added a Windows Firewall inbound rule (requires admin PowerShell):
+  ```powershell
+  netsh advfirewall firewall add rule name="Aegis AI Port 3001" dir=in action=allow protocol=TCP localport=3001 profile=private,domain
+  ```
+* **Verification:** `netsh advfirewall firewall show rule name="Aegis AI Port 3001"` confirmed rule as Enabled.
+
+---
+
+## 7. CI/CD
+
+### Bug 20: New Page File Not Staged — GitHub Actions Build Failure
+* **The Issue:** GitHub Actions failed with `TS2307: Cannot find module './pages/AIIntegrationPage.js' or its corresponding type declarations`.
+* **Root Cause:** `git commit -am` only stages files that are already tracked by Git. `AIIntegrationPage.tsx` was a brand-new file and untracked, so Git silently skipped it. The file existed locally but was absent from the repository.
+* **The Fix:** Used `git add .` explicitly before committing to stage all new untracked files.
+
+---
+
+## 8. AI Integration Settings
+
+### Bug 21: Test API Button Non-Functional (Static UI)
+* **The Issue:** The "Test API" button in the AI Integration settings page was a visual placeholder — tapping it did nothing at all.
+* **The Fix:** Implemented `handleTestAPI()` in `AIIntegrationPage.tsx`: POSTs to `/api/generate/test`, shows an animated spinner during the test, and updates the status label to "API ready" (green) or "Connection failed" (red) based on the backend response.
+* **Commit:** `ded0c7a`
+
+### Bug 22: Test API Calling LM Studio Directly From Phone (404 / CORS Failure)
+* **The Issue:** After the button was wired up, it returned 404. The frontend was directly calling `http://192.168.29.240:1234/v1/chat/completions` (LM Studio's port) from the phone WebView — a different port with no firewall rule and no CORS headers.
+* **Root Cause:** Initial implementation made the test request directly from the WebView to LM Studio instead of routing through the Node.js backend.
+* **The Fix:**
+  * Created `POST /api/generate/test` backend endpoint in `server/src/routes/generation.ts` that proxies the connectivity test.
+  * Updated `AIIntegrationPage.tsx` to call `${getApiBaseUrl()}/generate/test` — the phone calls the Node backend, and the backend calls LM Studio. The phone never talks to LM Studio directly.
+* **Commit:** `ded0c7a`
+
+### Bug 23: `aiConfig` Not Passed to Backend During Chat Generation
+* **The Issue:** The app always used the hardcoded `.env` LM Studio URL for generation regardless of what the user configured in AI Integration settings.
+* **Root Cause:** `useStreamChat.ts` never read from `localStorage` or included `aiConfig` in the POST body to `/api/generate` or `/api/generate/regenerate`.
+* **The Fix:** Added `getAiConfig()` helper in `useStreamChat.ts` that reads `ai_provider`, `ai_endpoint`, `ai_api_key`, `ai_model` from `localStorage` and injects them into all three generation request paths (send, go-on, regenerate).
+* **Commit:** `4499ab4`
+
+---
+
+## 9. Mobile UI / UX
+
+### Bug 24: Sidebar Not Closing on Mobile When Tapping Settings Links
+* **The Issue:** Tapping "AI Integration Settings" or "App & Database Settings" in the sidebar navigated to the correct page, but the sidebar overlay remained open on top of the new page.
+* **Root Cause:** The `<Link>` components at the bottom of `Sidebar.tsx` had no `onClick` handler to close the sidebar.
+* **The Fix:** Added `onClick={() => dispatch(setSidebarOpen(false))}` to both settings links.
+* **Commit:** `a86a338`
+
+### Bug 25: Navbar UI Overlapping Punch-Hole Camera on Android
+* **The Issue:** The header bar was crammed into the punch-hole camera cutout area — action buttons and the character name were visually hidden behind the camera.
+* **Root Cause:** `pt-[env(safe-area-inset-top)]` alone was insufficient. Some Android devices with punch-hole displays do not correctly report the safe area inset, and the header was fixed at `h-14` with no minimum guaranteed gap.
+* **The Fix:** Changed `Header.tsx` to use `pt-[max(env(safe-area-inset-top),1.5rem)]` with `min-h-[4rem]` (dynamic height), ensuring a guaranteed minimum clearance regardless of device-reported insets.
+* **Commit:** `a86a338`
+
+---
+
+## Verification Summary (Session 2)
+* **Android APK:** Mixed content blocking resolved — all API requests now reach `192.168.29.240:3001` successfully.
+* **Windows Firewall:** Port 3001 rule confirmed active via `netsh`.
+* **AI Integration UI:** Test API functional with backend proxy; Network Diagnostics console added for real-time debugging.
+* **GitHub Actions:** Build pipeline unblocked — all new files staged and committed correctly.
