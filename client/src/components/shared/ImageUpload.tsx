@@ -100,12 +100,13 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 w-full">
-        <div className="flex flex-wrap items-center gap-2">
-          {label && <label className="text-xs font-semibold text-slate-300">{label}</label>}
+      {/* Clean One-Liner Header */}
+      <div className="flex items-center justify-between gap-1.5 whitespace-nowrap min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {label && <label className="text-xs font-semibold text-slate-300 truncate">{label}</label>}
           {isAnimated && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 whitespace-nowrap shadow-xs">
-              <Sparkles className="w-2.5 h-2.5 flex-shrink-0" /> Moving WebP / GIF
+            <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 flex-shrink-0">
+              <Sparkles className="w-2.5 h-2.5" /> Animated
             </span>
           )}
         </div>
@@ -117,20 +118,25 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
               setRawImageForCrop(preview);
               setIsCropOpen(true);
             }}
-            className="self-start sm:self-auto text-[11px] text-brand-400 hover:text-brand-300 flex items-center gap-1.5 font-medium px-2 py-1 rounded-lg bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/20 transition-all whitespace-nowrap active:scale-95"
+            className="text-[11px] text-brand-400 hover:text-brand-300 flex items-center gap-1 font-medium flex-shrink-0 hover:underline"
+            title="Adjust Crop & Framing"
           >
-            <Crop className="w-3 h-3 flex-shrink-0" /> Adjust Crop / Framing
+            <Crop className="w-3 h-3" /> Crop
           </button>
         )}
       </div>
 
       <div
         onClick={() => fileInputRef.current?.click()}
-        className={`relative overflow-hidden rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center group ${
+        className={`relative overflow-hidden border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center group ${
           preview
             ? "border-brand-500/40 bg-dark-900/40 hover:border-brand-400"
             : "border-white/10 bg-dark-900/60 hover:border-white/20 hover:bg-dark-850"
-        } ${type === "avatar" ? "h-28 w-28 mx-auto" : "h-36 w-full"}`}
+        } ${
+          type === "avatar"
+            ? "w-24 h-24 sm:w-28 sm:h-28 rounded-full mx-auto"
+            : "h-32 sm:h-36 w-full rounded-2xl"
+        }`}
       >
         <input
           ref={fileInputRef}
@@ -147,10 +153,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
               alt="Preview"
               className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
-            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs gap-1 backdrop-blur-xs">
+            <div className={`absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs gap-1 backdrop-blur-xs ${
+              type === "avatar" ? "rounded-full" : "rounded-2xl"
+            }`}>
               <UploadCloud className="w-5 h-5" />
-              <span>Change Image</span>
-              {isAnimated && <span className="text-[10px] text-purple-300">Animation preserved</span>}
+              <span className="text-[11px]">Change</span>
             </div>
           </>
         ) : (
@@ -161,9 +168,8 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
               <UploadCloud className="w-6 h-6 group-hover:text-brand-400 transition-colors" />
             )}
             <span className="text-[11px] font-medium">
-              {uploading ? "Uploading..." : `Click to upload ${type}`}
+              {uploading ? "Uploading..." : `Upload ${type}`}
             </span>
-            <span className="text-[10px] text-slate-500">Supports animated WebP, GIF, PNG, JPG</span>
           </div>
         )}
       </div>
