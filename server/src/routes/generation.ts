@@ -14,10 +14,11 @@ export const generationRouter = Router();
 
 // POST /api/generate (SSE Streaming)
 generationRouter.post("/", async (req, res, next) => {
-  const { sessionId, userMessage, maxTokens, model } = req.body;
+  const { sessionId, userMessage, maxTokens, model, goOn } = req.body;
+  const isGoOn = Boolean(goOn);
 
-  if (!sessionId || !userMessage?.trim()) {
-    res.status(400).json({ error: "sessionId and userMessage are required." });
+  if (!sessionId || (!isGoOn && !userMessage?.trim())) {
+    res.status(400).json({ error: "sessionId and userMessage are required (unless goOn is true)." });
     return;
   }
 
@@ -40,24 +41,30 @@ generationRouter.post("/", async (req, res, next) => {
       return;
     }
 
-    // 1. Determine next orderIndex
+    // 1. Determine next orderIndex & handle user message
     const lastMsg = session.messages[session.messages.length - 1];
-    const userOrderIndex = (lastMsg ? lastMsg.orderIndex : -1) + 1;
+    let userMsg: any = null;
+    let assistantOrderIndex: number;
+    let allMessagesForPrompt = session.messages;
 
-    // 2. Save User Message
-    const userMsg = await prisma.message.create({
-      data: {
-        sessionId,
-        sender: "user",
-        orderIndex: userOrderIndex,
-        swipes: serializeSwipes([userMessage.trim()]),
-        activeSwipeIndex: 0,
-      },
-    });
+    if (!isGoOn && userMessage?.trim()) {
+      const userOrderIndex = (lastMsg ? lastMsg.orderIndex : -1) + 1;
+      userMsg = await prisma.message.create({
+        data: {
+          sessionId,
+          sender: "user",
+          orderIndex: userOrderIndex,
+          swipes: serializeSwipes([userMessage.trim()]),
+          activeSwipeIndex: 0,
+        },
+      });
+      allMessagesForPrompt = [...session.messages, userMsg];
+      assistantOrderIndex = userOrderIndex + 1;
+    } else {
+      assistantOrderIndex = (lastMsg ? lastMsg.orderIndex : -1) + 1;
+    }
 
-    const allMessagesForPrompt = [...session.messages, userMsg];
-
-    // 3. Assemble Context
+    // 2. Assemble Context
     const effectiveMaxTokens =
       typeof maxTokens === "number" ? maxTokens : session.preferredMaxTokens;
 
@@ -77,7 +84,18 @@ generationRouter.post("/", async (req, res, next) => {
       preferredMaxTokens: effectiveMaxTokens,
     });
 
-    // 4. Set SSE Headers
+    const userName = session.userPersona?.name || "User";
+    const charName = session.character.name;
+
+    // For "Go on", append a transient continuation instruction for the LLM (not stored in DB)
+    if (isGoOn) {
+      compiledMessages.push({
+        role: "user",
+        content: `(Continue the narrative, scene, and actions as ${charName} from the current point. Stay strictly in character and describe the next events, dialogue, and actions. Do not speak or act for ${userName}.)`,
+      });
+    }
+
+    // 3. Set SSE Headers
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -88,16 +106,16 @@ generationRouter.post("/", async (req, res, next) => {
       abortController.abort();
     });
 
-    // Send user message confirmation event first
-    res.write(
-      `data: ${JSON.stringify({
-        type: "user_message",
-        message: { ...userMsg, swipes: [userMessage.trim()] },
-      })}\n\n`
-    );
+    // Send user message confirmation event if a user message was created
+    if (userMsg) {
+      res.write(
+        `data: ${JSON.stringify({
+          type: "user_message",
+          message: { ...userMsg, swipes: [userMessage.trim()] },
+        })}\n\n`
+      );
+    }
 
-    const userName = session.userPersona?.name || "User";
-    const charName = session.character.name;
     const stopTokens = [
       `\n${userName}:`,
       `\n\n${userName}:`,
@@ -107,7 +125,7 @@ generationRouter.post("/", async (req, res, next) => {
       `\n\n{{user}}:`,
     ];
 
-    // 5. Stream from LM Studio
+    // 4. Stream from LM Studio
     let assistantFullText = "";
     const startTime = performance.now();
 
@@ -115,6 +133,11 @@ generationRouter.post("/", async (req, res, next) => {
       assistantFullText = await lmStudioClient.streamChat({
         messages: compiledMessages,
         maxTokens: effectiveMaxTokens,
+        temperature: 0.85,
+        topP: 0.92,
+        presencePenalty: 0.2,
+        frequencyPenalty: 0.2,
+        seed: Math.floor(Math.random() * 100000000),
         model,
         stop: stopTokens,
         signal: abortController.signal,
@@ -139,9 +162,8 @@ generationRouter.post("/", async (req, res, next) => {
 
     const durationMs = Math.round(performance.now() - startTime);
 
-    // 6. Sanitize and Save Assistant Response in DB
+    // 5. Sanitize and Save Assistant Response in DB
     const cleanedText = sanitizeAssistantResponse(assistantFullText, userName, charName);
-    const assistantOrderIndex = userOrderIndex + 1;
     const assistantMsg = await prisma.message.create({
       data: {
         sessionId,
@@ -166,6 +188,7 @@ generationRouter.post("/", async (req, res, next) => {
     res.write(
       `data: ${JSON.stringify({
         type: "done",
+        userMessage: userMsg ? { ...userMsg, swipes: [userMessage.trim()] } : null,
         message: { ...assistantMsg, swipes: [cleanedText] },
       })}\n\n`
     );
@@ -174,166 +197,6 @@ generationRouter.post("/", async (req, res, next) => {
     // 7. Background: Async rolling summary check (non-blocking)
     checkAndTriggerRollingSummary(sessionId).catch((err) =>
       console.error("[Generation] Summary trigger error:", err)
-    );
-  } catch (err: any) {
-    next(err);
-  }
-});
-
-// POST /api/generate/continue (SSE Streaming - Story continuation without user prompt)
-generationRouter.post("/continue", async (req, res, next) => {
-  const { sessionId, maxTokens, model } = req.body;
-
-  if (!sessionId) {
-    res.status(400).json({ error: "sessionId is required." });
-    return;
-  }
-
-  try {
-    const session = await prisma.chatSession.findUnique({
-      where: { id: sessionId },
-      include: {
-        character: true,
-        userPersona: true,
-        memories: true,
-        messages: {
-          where: { isDeleted: false },
-          orderBy: { orderIndex: "asc" },
-        },
-      },
-    });
-
-    if (!session) {
-      res.status(404).json({ error: "Chat session not found." });
-      return;
-    }
-
-    if (session.messages.length === 0) {
-      res.status(400).json({ error: "Cannot continue a session with no messages." });
-      return;
-    }
-
-    // 1. Determine next orderIndex
-    const lastMsg = session.messages[session.messages.length - 1];
-    const assistantOrderIndex = (lastMsg ? lastMsg.orderIndex : -1) + 1;
-
-    // 2. Assemble Context
-    const effectiveMaxTokens =
-      typeof maxTokens === "number" ? maxTokens : session.preferredMaxTokens;
-
-    if (typeof maxTokens === "number" && maxTokens !== session.preferredMaxTokens) {
-      prisma.chatSession
-        .update({
-          where: { id: sessionId },
-          data: { preferredMaxTokens: maxTokens },
-        })
-        .catch((e) => console.error("[Generation] Failed updating preferredMaxTokens:", e));
-    }
-
-    const { messages: compiledMessages } = assembleContext({
-      character: session.character,
-      userPersona: session.userPersona,
-      pinnedMemories: session.memories,
-      rollingSummary: session.rollingSummary,
-      messages: session.messages,
-      preferredMaxTokens: effectiveMaxTokens,
-    });
-
-    const userName = session.userPersona?.name || "User";
-    const charName = session.character.name;
-
-    // 3. Inject Continuation Directive
-    compiledMessages.push({
-      role: "user",
-      content: `[Directive: Continue your previous response or advance the scene and dialogue naturally as ${charName}. Progress the narrative, your thoughts, physical reactions, or spoken dialogue. Do not repeat previous sentences or speak for ${userName}.]`,
-    });
-
-    // 4. Set SSE Headers
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders?.();
-
-    const abortController = new AbortController();
-    req.on("close", () => {
-      abortController.abort();
-    });
-
-    const stopTokens = [
-      `\n${userName}:`,
-      `\n\n${userName}:`,
-      `\nUser:`,
-      `\n\nUser:`,
-      `\n{{user}}:`,
-      `\n\n{{user}}:`,
-    ];
-
-    // 5. Stream from LM Studio
-    let assistantFullText = "";
-    const startTime = performance.now();
-
-    try {
-      assistantFullText = await lmStudioClient.streamChat({
-        messages: compiledMessages,
-        maxTokens: effectiveMaxTokens,
-        model,
-        stop: stopTokens,
-        signal: abortController.signal,
-        onToken: (token) => {
-          res.write(`data: ${JSON.stringify({ type: "token", token })}\n\n`);
-        },
-      });
-    } catch (streamErr: any) {
-      if (abortController.signal.aborted) {
-        console.log("[Generation] Continuation stream aborted by client.");
-        return;
-      }
-      res.write(
-        `data: ${JSON.stringify({
-          type: "error",
-          error: streamErr.message || "Failed during continuation stream",
-        })}\n\n`
-      );
-      res.end();
-      return;
-    }
-
-    const durationMs = Math.round(performance.now() - startTime);
-
-    // 6. Sanitize and Save Assistant Response in DB
-    const cleanedText = sanitizeAssistantResponse(assistantFullText, userName, charName);
-    const assistantMsg = await prisma.message.create({
-      data: {
-        sessionId,
-        sender: "assistant",
-        orderIndex: assistantOrderIndex,
-        swipes: serializeSwipes([cleanedText]),
-        activeSwipeIndex: 0,
-      },
-    });
-
-    logGenerationMetrics({
-      sessionId,
-      characterName: charName,
-      orderIndex: assistantOrderIndex,
-      isRegeneration: false,
-      durationMs,
-      promptLength: compiledMessages.reduce((sum, m) => sum + m.content.length, 0),
-      outputLength: cleanedText.length,
-    });
-
-    // Send final completion message event
-    res.write(
-      `data: ${JSON.stringify({
-        type: "done",
-        message: { ...assistantMsg, swipes: [cleanedText] },
-      })}\n\n`
-    );
-    res.end();
-
-    // 7. Background: Async rolling summary check (non-blocking)
-    checkAndTriggerRollingSummary(sessionId).catch((err) =>
-      console.error("[Generation] Summary trigger error on continue:", err)
     );
   } catch (err: any) {
     next(err);
@@ -391,18 +254,6 @@ generationRouter.post("/regenerate", async (req, res, next) => {
       preferredMaxTokens: effectiveMaxTokens,
     });
 
-    const userName = session.userPersona?.name || "User";
-    const charName = session.character.name;
-
-    // If target message was a continuation (preceded by another assistant message), inject continuation directive
-    const prevMsg = contextMessages[contextMessages.length - 1];
-    if (prevMsg && prevMsg.sender === "assistant") {
-      compiledMessages.push({
-        role: "user",
-        content: `[Directive: Continue your previous response or advance the scene and dialogue naturally as ${charName}. Progress the narrative, your thoughts, physical reactions, or spoken dialogue. Do not repeat previous sentences or speak for ${userName}.]`,
-      });
-    }
-
     // Setup SSE
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -412,11 +263,17 @@ generationRouter.post("/regenerate", async (req, res, next) => {
     const abortController = new AbortController();
     req.on("close", () => abortController.abort());
 
+    const userName = session.userPersona?.name || "User";
+    const charName = session.character.name;
     const currentSwipes = parseSwipes(targetMsg.swipes);
     const previousSwipe = currentSwipes[targetMsg.activeSwipeIndex] || currentSwipes[currentSwipes.length - 1] || "";
 
-    // Gradually elevate temperature on repeated regenerations to promote distinct phrasing
-    const dynamicTemperature = Math.min(0.8 + (currentSwipes.length - 1) * 0.05, 1.05);
+    // Elevate temperature, penalties, and provide a fresh random seed on each regeneration
+    const dynamicTemperature = Math.min(0.85 + (currentSwipes.length - 1) * 0.08, 1.15);
+    const dynamicPresencePenalty = Math.min(0.25 + (currentSwipes.length - 1) * 0.1, 0.65);
+    const dynamicFrequencyPenalty = Math.min(0.2 + (currentSwipes.length - 1) * 0.08, 0.55);
+    const dynamicTopP = Math.max(0.92 - (currentSwipes.length - 1) * 0.02, 0.82);
+    const dynamicSeed = Math.floor(Math.random() * 100000000);
 
     const stopTokens = [
       `\n${userName}:`,
@@ -435,6 +292,10 @@ generationRouter.post("/regenerate", async (req, res, next) => {
         messages: compiledMessages,
         maxTokens: effectiveMaxTokens,
         temperature: dynamicTemperature,
+        topP: dynamicTopP,
+        presencePenalty: dynamicPresencePenalty,
+        frequencyPenalty: dynamicFrequencyPenalty,
+        seed: dynamicSeed,
         model,
         stop: stopTokens,
         signal: abortController.signal,

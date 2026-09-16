@@ -54,50 +54,89 @@ export function assembleContext(params: AssembleContextParams): {
   const charName = character.name;
   const userName = userPersona?.name || "User";
 
-  // 1. Build System Message
+  // 1. Build System Message (7-Layer Hierarchy)
   const systemSections: string[] = [];
 
-  // 1.1 Character Core Persona & Lore
+  // LAYER 1: CHARACTER DEFINITION (Canonical Lore & World Origin)
+  const definitionParts: string[] = [];
+  if (character.description && character.description.trim()) {
+    const processedDesc = interpolateMacros(character.description.trim(), charName, userName);
+    definitionParts.push(`[Character Definition (Canonical Identity)]\n${processedDesc}`);
+  }
   const processedSystemPrompt = interpolateMacros(
     character.systemPrompt,
     charName,
     userName
   );
-  systemSections.push(`[Character Identity: ${charName}]\n${processedSystemPrompt}`);
+  definitionParts.push(`[Character Origin & World Lore]\n${processedSystemPrompt}`);
+  systemSections.push(definitionParts.join("\n\n"));
 
-  if (character.exampleDialogue) {
+  // LAYER 2: CHARACTER PERSONA (Dynamic Demeanor & Speaking Style)
+  const personaParts: string[] = [];
+  if (character.persona && character.persona.trim()) {
+    const processedPersona = interpolateMacros(character.persona.trim(), charName, userName);
+    personaParts.push(`[Active Persona & Speaking Demeanor]\n${processedPersona}`);
+  }
+  if (character.exampleDialogue && character.exampleDialogue.trim()) {
     const processedExamples = interpolateMacros(
-      character.exampleDialogue,
+      character.exampleDialogue.trim(),
       charName,
       userName
     );
-    systemSections.push(`[Example Dialogue Style]\n${processedExamples}`);
+    personaParts.push(`[Example Dialogue Style]\n${processedExamples}`);
+  }
+  if (personaParts.length > 0) {
+    systemSections.push(personaParts.join("\n\n"));
   }
 
-  // 1.2 User Persona
-  if (userPersona && userPersona.description) {
+  // LAYER 3: USER DEFINITION (Persona & Relationship to Character)
+  if (userPersona && userPersona.description && userPersona.description.trim()) {
     const processedUserDesc = interpolateMacros(
-      userPersona.description,
+      userPersona.description.trim(),
       charName,
       userName
     );
     systemSections.push(
-      `[User Identity: ${userName}]\nThe user interacting with you is named ${userName}. Details:\n${processedUserDesc}`
+      `[User Definition: ${userName}]\n${processedUserDesc}`
     );
   }
 
-  // 1.3 Pinned Core Memories
+  // LAYER 4: AUTHORITATIVE PRONOUN & REFERENCE MAP
+  const charPronouns = [
+    character.pronounSubject || (character.gender === "female" ? "she" : character.gender === "male" ? "he" : null),
+    character.pronounObject || (character.gender === "female" ? "her" : character.gender === "male" ? "him" : null),
+    character.pronounPossessive || (character.gender === "female" ? "hers" : character.gender === "male" ? "his" : null),
+    character.pronounDeterminer || (character.gender === "female" ? "her" : character.gender === "male" ? "his" : null),
+  ].filter(Boolean);
+
+  const userPronouns = [
+    userPersona?.pronounSubject || (userPersona?.gender === "female" ? "she" : userPersona?.gender === "male" ? "he" : null),
+    userPersona?.pronounObject || (userPersona?.gender === "female" ? "her" : userPersona?.gender === "male" ? "him" : null),
+    userPersona?.pronounPossessive || (userPersona?.gender === "female" ? "hers" : userPersona?.gender === "male" ? "his" : null),
+    userPersona?.pronounDeterminer || (userPersona?.gender === "female" ? "her" : userPersona?.gender === "male" ? "his" : null),
+  ].filter(Boolean);
+
+  const referenceLines: string[] = [
+    `• {{char}} = ${charName} (Primary Character)` +
+      (character.gender ? ` | Gender: ${character.gender}` : "") +
+      (charPronouns.length ? ` | Pronouns: ${charPronouns.join("/")}` : ""),
+    `• {{user}} = ${userName} (Conversational Partner)` +
+      (userPersona?.gender ? ` | Gender: ${userPersona.gender}` : "") +
+      (userPronouns.length ? ` | Pronouns: ${userPronouns.join("/")}` : ""),
+  ];
+  systemSections.push(`[Grammar & Participant Reference Map]\n${referenceLines.join("\n")}`);
+
+  // LAYER 5: PERSISTENT CONVERSATION STATE (Memories, Summary, Causality)
   if (pinnedMemories && pinnedMemories.length > 0) {
     const memoryLines = pinnedMemories.map((m) => {
       const content = interpolateMacros(m.content, charName, userName);
       return m.label ? `- [${m.label}] ${content}` : `- ${content}`;
     });
     systemSections.push(
-      `[Key Pinned Memories & Lore (Never Forget)]\n${memoryLines.join("\n")}`
+      `[Key Pinned Memories & Established Lore]\n${memoryLines.join("\n")}`
     );
   }
 
-  // 1.4 Rolling Summary ("The Story So Far")
   if (rollingSummary && rollingSummary.trim()) {
     const processedSummary = interpolateMacros(
       rollingSummary,
@@ -105,7 +144,7 @@ export function assembleContext(params: AssembleContextParams): {
       userName
     );
     systemSections.push(
-      `[The Story So Far (Previous Events Summary)]\n${processedSummary.trim()}`
+      `[The Story So Far (Persistent State Summary)]\n${processedSummary.trim()}`
     );
   }
 
@@ -120,12 +159,34 @@ export function assembleContext(params: AssembleContextParams): {
     lengthGuidance = "Provide an extensive, novel-length response with immersive atmosphere, inner thoughts, and detailed dialogue.";
   }
 
-  // 1.5 Roleplay and formatting instruction + Strict Anti-Impersonation Rule + Dynamic Length
+  // SEMANTIC DIRECTION CONSTRAINT & ROLEPLAY MANDATE
   systemSections.push(
-    `[Roleplay Guidelines]\n` +
-      `Stay strictly in-character as ${charName}. Write richly and expressively using *italics for actions, body language, thoughts, and atmosphere*, and "quotations for spoken dialogue". React directly to ${userName}.\n` +
-      `Length Target: ${lengthGuidance}\n` +
-      `CRITICAL MANDATE: You are ${charName} ONLY. NEVER speak, act, narrate, or make decisions for ${userName}. Do not write "${userName}:" under any circumstance. End your message as soon as ${charName} finishes speaking or acting.`
+    `[Semantic Direction & Role Preservation]\n` +
+      `You are strictly ${charName}. You are in an interactive roleplay with ${userName}.\n` +
+      `• PRONOUN RESOLUTION:\n` +
+      `  Pronouns and names identify participants according to the configured participant/reference map.\n` +
+      `  Pronouns do NOT inherently determine grammatical roles.\n` +
+      `• ROLE PRESERVATION:\n` +
+      `  Preserve the grammatical and semantic roles expressed by the user's sentence.\n` +
+      `  Do not reverse:\n` +
+      `  - actor\n` +
+      `  - subject\n` +
+      `  - object\n` +
+      `  - recipient\n` +
+      `  - source\n` +
+      `  - target\n` +
+      `  - direction of an action\n` +
+      `  Never reverse these relationships merely because a participant appears as an object/determiner pronoun.\n` +
+      `• PERSPECTIVE & PRONOUN ANCHORS:\n` +
+      `  - From your viewpoint, you are "${charName}" (first-person "I / me / my / myself").\n` +
+      `  - From your viewpoint, the user is "${userName}" (second-person "you / your / yourself" when addressing them).\n` +
+      `  - When ${userName} writes to you, any second-person pronouns ("you", "your") refer to YOU (${charName}).\n` +
+      `• ANTI-IMPERSONATION MANDATE:\n` +
+      `  - You are ${charName} ONLY. NEVER speak, act, narrate thoughts, or make decisions for ${userName}.\n` +
+      `  - Do not write "${userName}:" under any circumstance. End your message as soon as ${charName} finishes speaking or acting.\n` +
+      `• FORMATTING & STYLE:\n` +
+      `  - Write richly and expressively using *italics for actions, body language, thoughts, and atmosphere*, and "quotations for spoken dialogue".\n` +
+      `  - Length Target: ${lengthGuidance}`
   );
 
   const fullSystemContent = systemSections.join("\n\n");
@@ -143,6 +204,9 @@ export function assembleContext(params: AssembleContextParams): {
   const slidingWindow: ChatMessage[] = [];
   let accumulatedTokens = 0;
 
+  const sanitizedUserName = sanitizeRoleplayName(userName);
+  const sanitizedCharName = sanitizeRoleplayName(charName);
+
   for (let i = activeMessages.length - 1; i >= 0; i--) {
     const msg = activeMessages[i];
     const rawContent = extractActiveSwipe(msg);
@@ -155,9 +219,11 @@ export function assembleContext(params: AssembleContextParams): {
     }
 
     accumulatedTokens += msgTokens;
+    const speakerName = msg.sender === "user" ? sanitizedUserName : sanitizedCharName;
     slidingWindow.unshift({
       role: msg.sender === "user" ? "user" : "assistant",
-      content,
+      name: speakerName,
+      content: `${speakerName}: ${content}`,
     });
   }
 
@@ -208,5 +274,9 @@ export function sanitizeAssistantResponse(
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function sanitizeRoleplayName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "User";
 }
 

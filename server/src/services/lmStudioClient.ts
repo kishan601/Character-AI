@@ -3,6 +3,7 @@ import { config } from "../config.js";
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
+  name?: string;
 }
 
 export interface LMStudioHealth {
@@ -58,6 +59,10 @@ export class LMStudioClient {
     messages: ChatMessage[];
     maxTokens?: number;
     temperature?: number;
+    topP?: number;
+    presencePenalty?: number;
+    frequencyPenalty?: number;
+    seed?: number;
     model?: string;
   }): Promise<string> {
     const res = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -68,7 +73,11 @@ export class LMStudioClient {
         messages: params.messages,
         max_tokens: params.maxTokens || 400,
         max_completion_tokens: params.maxTokens || 400,
-        temperature: params.temperature ?? 0.8,
+        temperature: params.temperature ?? 0.85,
+        top_p: params.topP ?? 0.92,
+        presence_penalty: params.presencePenalty ?? 0.2,
+        frequency_penalty: params.frequencyPenalty ?? 0.2,
+        seed: params.seed ?? Math.floor(Math.random() * 100000000),
         stream: false,
       }),
     });
@@ -86,6 +95,10 @@ export class LMStudioClient {
     messages: ChatMessage[];
     maxTokens?: number;
     temperature?: number;
+    topP?: number;
+    presencePenalty?: number;
+    frequencyPenalty?: number;
+    seed?: number;
     model?: string;
     stop?: string[];
     signal?: AbortSignal;
@@ -99,7 +112,11 @@ export class LMStudioClient {
         messages: params.messages,
         max_tokens: params.maxTokens || 400,
         max_completion_tokens: params.maxTokens || 400,
-        temperature: params.temperature ?? 0.8,
+        temperature: params.temperature ?? 0.85,
+        top_p: params.topP ?? 0.92,
+        presence_penalty: params.presencePenalty ?? 0.2,
+        frequency_penalty: params.frequencyPenalty ?? 0.2,
+        seed: params.seed ?? Math.floor(Math.random() * 100000000),
         stop: params.stop && params.stop.length > 0 ? params.stop : undefined,
         stream: true,
       }),
