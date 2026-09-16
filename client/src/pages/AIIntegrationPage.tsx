@@ -29,6 +29,10 @@ export const AIIntegrationPage: React.FC = () => {
   // Temporary edit states for modals
   const [editValue, setEditValue] = useState("");
 
+  // Test API state
+  const [isTesting, setIsTesting] = useState(false);
+  const [testStatus, setTestStatus] = useState<"idle" | "ready" | "error">("idle");
+
   const openModal = (modalName: typeof activeModal, currentValue: string) => {
     setEditValue(currentValue);
     setActiveModal(modalName);
@@ -40,6 +44,38 @@ export const AIIntegrationPage: React.FC = () => {
     if (activeModal === "apiKey") setApiKey(editValue);
     if (activeModal === "model") setModel(editValue);
     setActiveModal(null);
+    setTestStatus("idle"); // Reset status when settings change
+  };
+
+  const handleTestAPI = async () => {
+    if (isTesting) return;
+    setIsTesting(true);
+    setTestStatus("idle");
+    
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiKey ? { "Authorization": `Bearer ${apiKey}` } : {})
+        },
+        body: JSON.stringify({
+          model: model || "local-model",
+          messages: [{ role: "user", content: "Hi" }],
+          max_tokens: 5
+        })
+      });
+
+      if (res.ok) {
+        setTestStatus("ready");
+      } else {
+        setTestStatus("error");
+      }
+    } catch (err) {
+      setTestStatus("error");
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   return (
@@ -132,14 +168,23 @@ export const AIIntegrationPage: React.FC = () => {
           </div>
 
           {/* Test API */}
-          <div className="flex items-center p-[18px] cursor-pointer hover:bg-white/5 transition-colors active:bg-white/10">
+          <div 
+            onClick={handleTestAPI}
+            className={`flex items-center p-[18px] cursor-pointer hover:bg-white/5 transition-colors active:bg-white/10 ${isTesting ? "opacity-70 pointer-events-none" : ""}`}
+          >
             <div className="flex items-center gap-4 min-w-0">
-              <div className="w-[46px] h-[46px] flex-shrink-0 rounded-[18px] bg-[#f8b76c] flex items-center justify-center text-[#2a1708]">
-                <Check className="w-[26px] h-[26px] stroke-[3]" />
+              <div className={`w-[46px] h-[46px] flex-shrink-0 rounded-[18px] flex items-center justify-center ${testStatus === 'error' ? 'bg-red-500/20 text-red-500' : 'bg-[#f8b76c] text-[#2a1708]'}`}>
+                {isTesting ? (
+                  <div className="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Check className="w-[26px] h-[26px] stroke-[3]" />
+                )}
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[16px] font-medium text-[#f4f3f0] mb-[3px]">Test API</span>
-                <span className="text-[14px] text-[#c58245] font-medium">API ready</span>
+                <span className={`text-[14px] font-medium ${testStatus === 'error' ? 'text-red-400' : 'text-[#c58245]'}`}>
+                  {isTesting ? "Testing connection..." : testStatus === "ready" ? "API ready" : testStatus === "error" ? "Connection failed" : "Tap to test"}
+                </span>
               </div>
             </div>
           </div>
