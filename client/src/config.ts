@@ -6,8 +6,8 @@ export const getApiBaseUrl = () => {
     const cleanHost = host.replace(/\/$/, "");
     return `${cleanHost}/api`;
   }
-  // Fallback for development (Vite dev server)
-  return "/api";
+  // Fallback to your PC's local network IP for the Capacitor Android app
+  return "http://192.168.29.240:3001/api";
 };
 
 export const getUploadsBaseUrl = () => {
@@ -16,5 +16,5 @@ export const getUploadsBaseUrl = () => {
     const cleanHost = host.replace(/\/$/, "");
     return `${cleanHost}/uploads`;
   }
-  return "/uploads";
+  return "http://192.168.29.240:3001/uploads";
 };
