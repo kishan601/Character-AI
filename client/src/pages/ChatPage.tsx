@@ -10,6 +10,7 @@ import {
   useUnpinMemoryMutation,
   useUpdateSessionMutation,
   useGetHealthQuery,
+  useBatchDeleteMessagesMutation,
 } from "../api/baseApi.js";
 import { useStreamChat } from "../hooks/useStreamChat.js";
 import { Header } from "../components/layout/Header.js";
@@ -20,7 +21,7 @@ import { PinnedMemoriesDrawer } from "../components/memory/PinnedMemoriesDrawer.
 import { CharacterProfileDrawer } from "../components/characters/CharacterProfileDrawer.js";
 import { setMemoryDrawerOpen } from "../store/uiSlice.js";
 import { setMaxTokens } from "../store/chatSlice.js";
-import { Bot, RefreshCw } from "lucide-react";
+import { Bot, RefreshCw, Trash2 } from "lucide-react";
 
 export const ChatPage: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -51,6 +52,10 @@ export const ChatPage: React.FC = () => {
   const [pinMemory] = usePinMemoryMutation();
   const [unpinMemory] = useUnpinMemoryMutation();
   const [updateSession] = useUpdateSessionMutation();
+  const [batchDeleteMessages, { isLoading: isDeletingMessages }] = useBatchDeleteMessagesMutation();
+
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
 
   const {
     isStreaming,
@@ -59,8 +64,8 @@ export const ChatPage: React.FC = () => {
     optimisticUserMessage,
     regeneratingMessageId,
     sendMessage,
-    regenerateMessage,
     goOn,
+    regenerateMessage,
     stopStreaming,
   } = useStreamChat({
     sessionId: sessionId || "",
@@ -154,28 +159,67 @@ export const ChatPage: React.FC = () => {
     await unpinMemory(memoryId).unwrap();
   };
 
+  const handleToggleSelectMessage = (messageId: string) => {
+    setSelectedMessageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllMessages = () => {
+    if (selectedMessageIds.size === messages.length) {
+      setSelectedMessageIds(new Set());
+    } else {
+      setSelectedMessageIds(new Set(messages.map((m) => m.id)));
+    }
+  };
+
+  const handleConfirmDeleteMessages = async () => {
+    if (selectedMessageIds.size === 0) return;
+    const count = selectedMessageIds.size;
+    const confirmed = window.confirm(`Permanently delete ${count} selected message${count > 1 ? "s" : ""}?`);
+    if (!confirmed) return;
+
+    try {
+      await batchDeleteMessages({
+        sessionId: session.id,
+        messageIds: Array.from(selectedMessageIds),
+      }).unwrap();
+      setIsDeleteMode(false);
+      setSelectedMessageIds(new Set());
+    } catch (err) {
+      console.error("Failed to delete messages:", err);
+    }
+  };
+
   return (
-    <div className="relative flex-1 flex flex-col h-screen overflow-hidden bg-dark-950">
-      {/* 1. Fullscreen Wallpaper Background with Ambient Halo & Center Portrait Fit */}
+    <div className="relative flex-1 flex flex-col h-full overflow-hidden bg-dark-950">
+      {/* 1. Fullscreen Wallpaper Background (Portrait preserved on desktop, cover on mobile) */}
       {character.backgroundUrl && (
-        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none">
-          {/* Ambient blurred fill for widescreen borders */}
+        <>
+          {/* Ambient blurred backdrop on desktop to softly fill wide margins */}
           <div
-            className="absolute inset-0 bg-cover bg-center scale-110 transition-all duration-700"
+            className="hidden md:block absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-all duration-700 pointer-events-none select-none opacity-40 scale-105"
             style={{
               backgroundImage: `url(${character.backgroundUrl})`,
-              filter: `blur(${Math.max(character.bgBlur || 0, 16)}px)`,
+              filter: "blur(40px)",
             }}
           />
-          {/* Centered crisp image for vertical/portrait and widescreen artwork */}
+
+          {/* Main Wallpaper: Full cover on mobile, portrait contain on desktop */}
           <div
-            className="absolute inset-0 bg-contain bg-no-repeat bg-center transition-all duration-700"
+            className="absolute inset-0 z-0 bg-cover md:bg-contain bg-center bg-no-repeat transition-all duration-700 pointer-events-none select-none"
             style={{
               backgroundImage: `url(${character.backgroundUrl})`,
               filter: character.bgBlur ? `blur(${character.bgBlur}px)` : "none",
             }}
           />
-        </div>
+        </>
       )}
 
       {/* Dimming Overlay */}
@@ -202,6 +246,11 @@ export const ChatPage: React.FC = () => {
         onRefreshChat={() => refetch()}
         isRefreshing={isFetching}
         onOpenCharacterProfile={() => setIsProfileDrawerOpen(true)}
+        onToggleDeleteMode={() => {
+          setIsDeleteMode((prev) => !prev);
+          setSelectedMessageIds(new Set());
+        }}
+        isDeleteMode={isDeleteMode}
       />
 
       {/* 4. Main Chat View (fades out smoothly in Zen Mode) */}
@@ -221,24 +270,65 @@ export const ChatPage: React.FC = () => {
           isStreaming={isStreaming}
           optimisticUserMessage={optimisticUserMessage}
           regeneratingMessageId={regeneratingMessageId}
+          isDeleteMode={isDeleteMode}
+          selectedMessageIds={selectedMessageIds}
+          onToggleSelect={handleToggleSelectMessage}
           onEdit={handleEditMessage}
           onSwitchSwipe={handleSwitchSwipe}
           onRegenerateSwipe={handleRegenerateSwipe}
           onPinMemory={handlePinMemory}
         />
 
-        {/* Input Bar Area */}
-        <div className="p-4 sm:p-6 pt-0">
-          <ChatInput
-            onSendMessage={(txt) => sendMessage(txt, currentMaxTokens)}
-            onStopStreaming={stopStreaming}
-            onGoOn={() => goOn(currentMaxTokens)}
-            hasMessages={messages.length > 0}
-            isStreaming={isStreaming}
-            isLmStudioConnected={isLmConnected}
-            characterName={character.name}
-            onSavePreference={handleSaveTokenPreference}
-          />
+        {/* Input Bar or Floating Delete Action Bar */}
+        <div className="p-2 sm:p-4 pt-0 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] sm:pb-4">
+          {isDeleteMode ? (
+            <div className="max-w-4xl mx-auto flex items-center justify-between gap-2.5 p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-dark-900/95 border border-red-500/40 backdrop-blur-xl shadow-2xl animate-in slide-in-from-bottom-2">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  onClick={handleSelectAllMessages}
+                  className="text-xs font-semibold text-brand-300 hover:text-brand-200 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-dark-800 border border-white/10 transition-colors"
+                >
+                  {selectedMessageIds.size === messages.length ? "Deselect All" : "Select All"}
+                </button>
+                <span className="text-xs text-slate-300 font-medium">
+                  {selectedMessageIds.size} selected
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDeleteMode(false);
+                    setSelectedMessageIds(new Set());
+                  }}
+                  className="px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-dark-800 text-slate-300 hover:bg-dark-700 text-xs font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteMessages}
+                  disabled={selectedMessageIds.size === 0 || isDeletingMessages}
+                  className="px-3.5 sm:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-xs font-bold shadow-lg shadow-red-500/25 flex items-center gap-1.5 transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isDeletingMessages ? "Deleting..." : "Delete"}</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <ChatInput
+              onSendMessage={(txt) => sendMessage(txt, currentMaxTokens)}
+              onGoOn={() => goOn(currentMaxTokens)}
+              onStopStreaming={stopStreaming}
+              isStreaming={isStreaming}
+              isLmStudioConnected={isLmConnected}
+              characterName={character.name}
+              onSavePreference={handleSaveTokenPreference}
+            />
+          )}
         </div>
       </div>
 

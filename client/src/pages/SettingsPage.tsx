@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Server, User, Database, Sparkles, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
-import { useGetHealthQuery, useGetPersonasQuery, useCreatePersonaMutation, useDeletePersonaMutation } from "../api/baseApi.js";
+import { useGetHealthQuery, useGetPersonasQuery, useCreatePersonaMutation, useDeletePersonaMutation, useUpdatePersonaMutation } from "../api/baseApi.js";
 import { Header } from "../components/layout/Header.js";
 import { ImageUpload } from "../components/shared/ImageUpload.js";
 
@@ -9,28 +9,122 @@ export const SettingsPage: React.FC = () => {
   const { data: health, refetch: refetchHealth, isFetching: isCheckingHealth } = useGetHealthQuery();
   const { data: personas = [], refetch: refetchPersonas } = useGetPersonasQuery();
   const [createPersona] = useCreatePersonaMutation();
+  const [updatePersona] = useUpdatePersonaMutation();
   const [deletePersona] = useDeletePersonaMutation();
 
   const [newPersonaName, setNewPersonaName] = useState("");
   const [newPersonaDesc, setNewPersonaDesc] = useState("");
   const [newPersonaAvatar, setNewPersonaAvatar] = useState<string | null>(null);
+  const [newPersonaGender, setNewPersonaGender] = useState("male");
+  const [newPersonaPreset, setNewPersonaPreset] = useState("male");
+  const [newPronounSubject, setNewPronounSubject] = useState("he");
+  const [newPronounObject, setNewPronounObject] = useState("him");
+  const [newPronounPossessive, setNewPronounPossessive] = useState("his");
+  const [newPronounDeterminer, setNewPronounDeterminer] = useState("his");
+  const [isCustomPronouns, setIsCustomPronouns] = useState(false);
   const [isAddingPersona, setIsAddingPersona] = useState(false);
+  const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
+
+  const handleCancelForm = () => {
+    setNewPersonaName("");
+    setNewPersonaDesc("");
+    setNewPersonaAvatar(null);
+    setEditingPersonaId(null);
+    setIsAddingPersona(false);
+  };
+
+  const openEditPersona = (p: any) => {
+    setEditingPersonaId(p.id);
+    setNewPersonaName(p.name);
+    setNewPersonaDesc(p.description || "");
+    setNewPersonaAvatar(p.avatarUrl || null);
+    
+    setNewPersonaGender(p.gender || "");
+    setNewPronounSubject(p.pronounSubject || "");
+    setNewPronounObject(p.pronounObject || "");
+    setNewPronounPossessive(p.pronounPossessive || "");
+    setNewPronounDeterminer(p.pronounDeterminer || "");
+    
+    if (p.gender === "male" && p.pronounSubject === "he") {
+      setNewPersonaPreset("male");
+      setIsCustomPronouns(false);
+    } else if (p.gender === "female" && p.pronounSubject === "she") {
+      setNewPersonaPreset("female");
+      setIsCustomPronouns(false);
+    } else if (p.gender === "non-binary" && p.pronounSubject === "they") {
+      setNewPersonaPreset("non-binary");
+      setIsCustomPronouns(false);
+    } else if (!p.gender && !p.pronounSubject) {
+      setNewPersonaPreset("unspecified");
+      setIsCustomPronouns(false);
+    } else {
+      setNewPersonaPreset("custom");
+      setIsCustomPronouns(true);
+    }
+    
+    setIsAddingPersona(true);
+  };
+
+  const handlePresetChange = (preset: string) => {
+    setNewPersonaPreset(preset);
+    if (preset === "male") {
+      setNewPersonaGender("male");
+      setNewPronounSubject("he");
+      setNewPronounObject("him");
+      setNewPronounPossessive("his");
+      setNewPronounDeterminer("his");
+      setIsCustomPronouns(false);
+    } else if (preset === "female") {
+      setNewPersonaGender("female");
+      setNewPronounSubject("she");
+      setNewPronounObject("her");
+      setNewPronounPossessive("hers");
+      setNewPronounDeterminer("her");
+      setIsCustomPronouns(false);
+    } else if (preset === "non-binary") {
+      setNewPersonaGender("non-binary");
+      setNewPronounSubject("they");
+      setNewPronounObject("them");
+      setNewPronounPossessive("theirs");
+      setNewPronounDeterminer("their");
+      setIsCustomPronouns(false);
+    } else if (preset === "unspecified") {
+      setNewPersonaGender("");
+      setNewPronounSubject("");
+      setNewPronounObject("");
+      setNewPronounPossessive("");
+      setNewPronounDeterminer("");
+      setIsCustomPronouns(false);
+    } else if (preset === "custom") {
+      setIsCustomPronouns(true);
+    }
+  };
 
   const handleAddPersona = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPersonaName.trim() || !newPersonaDesc.trim()) return;
 
-    await createPersona({
+    const payload = {
       name: newPersonaName.trim(),
       description: newPersonaDesc.trim(),
+      gender: newPersonaGender.trim() || undefined,
+      pronounSubject: newPronounSubject.trim() || undefined,
+      pronounObject: newPronounObject.trim() || undefined,
+      pronounPossessive: newPronounPossessive.trim() || undefined,
+      pronounDeterminer: newPronounDeterminer.trim() || undefined,
       avatarUrl: newPersonaAvatar || undefined,
-      isDefault: personas.length === 0,
-    }).unwrap();
+    };
 
-    setNewPersonaName("");
-    setNewPersonaDesc("");
-    setNewPersonaAvatar(null);
-    setIsAddingPersona(false);
+    if (editingPersonaId) {
+      await updatePersona({ id: editingPersonaId, data: payload }).unwrap();
+    } else {
+      await createPersona({
+        ...payload,
+        isDefault: personas.length === 0,
+      }).unwrap();
+    }
+
+    handleCancelForm();
   };
 
   return (
@@ -112,7 +206,7 @@ export const SettingsPage: React.FC = () => {
             </h2>
             <button
               type="button"
-              onClick={() => setIsAddingPersona(!isAddingPersona)}
+              onClick={() => isAddingPersona ? handleCancelForm() : setIsAddingPersona(true)}
               className="px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold shadow-sm"
             >
               {isAddingPersona ? "Cancel" : "+ Add Persona"}
@@ -143,6 +237,86 @@ export const SettingsPage: React.FC = () => {
                 </div>
               </div>
 
+              <div className="p-3 rounded-xl bg-dark-950/70 border border-white/5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-slate-200">
+                    Gender & Pronoun Configuration
+                  </label>
+                  <select
+                    value={newPersonaPreset}
+                    onChange={(e) => handlePresetChange(e.target.value)}
+                    className="px-2.5 py-1 text-xs rounded-lg bg-dark-800 border border-white/10 text-brand-300 focus:outline-none"
+                  >
+                    <option value="male">Male (he/him/his)</option>
+                    <option value="female">Female (she/her/hers)</option>
+                    <option value="non-binary">Non-Binary (they/them/theirs)</option>
+                    <option value="unspecified">Unspecified / Neutral</option>
+                    <option value="custom">Custom...</option>
+                  </select>
+                </div>
+
+                {(isCustomPronouns || newPersonaPreset !== "unspecified") && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-white/5">
+                    <div>
+                      <label className="block text-[9px] uppercase font-mono text-slate-400">Subject</label>
+                      <input
+                        type="text"
+                        placeholder="he / she / they"
+                        value={newPronounSubject}
+                        onChange={(e) => {
+                          setNewPronounSubject(e.target.value);
+                          setIsCustomPronouns(true);
+                          setNewPersonaPreset("custom");
+                        }}
+                        className="w-full px-2 py-1 text-xs rounded bg-dark-900 border border-white/10 text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] uppercase font-mono text-slate-400">Object</label>
+                      <input
+                        type="text"
+                        placeholder="him / her / them"
+                        value={newPronounObject}
+                        onChange={(e) => {
+                          setNewPronounObject(e.target.value);
+                          setIsCustomPronouns(true);
+                          setNewPersonaPreset("custom");
+                        }}
+                        className="w-full px-2 py-1 text-xs rounded bg-dark-900 border border-white/10 text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] uppercase font-mono text-slate-400">Possessive</label>
+                      <input
+                        type="text"
+                        placeholder="his / hers / theirs"
+                        value={newPronounPossessive}
+                        onChange={(e) => {
+                          setNewPronounPossessive(e.target.value);
+                          setIsCustomPronouns(true);
+                          setNewPersonaPreset("custom");
+                        }}
+                        className="w-full px-2 py-1 text-xs rounded bg-dark-900 border border-white/10 text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] uppercase font-mono text-slate-400">Determiner</label>
+                      <input
+                        type="text"
+                        placeholder="his / her / their"
+                        value={newPronounDeterminer}
+                        onChange={(e) => {
+                          setNewPronounDeterminer(e.target.value);
+                          setIsCustomPronouns(true);
+                          setNewPersonaPreset("custom");
+                        }}
+                        className="w-full px-2 py-1 text-xs rounded bg-dark-900 border border-white/10 text-slate-200 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
                   Backstory & Appearance
@@ -160,7 +334,7 @@ export const SettingsPage: React.FC = () => {
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsAddingPersona(false)}
+                  onClick={handleCancelForm}
                   className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white"
                 >
                   Cancel
@@ -169,7 +343,7 @@ export const SettingsPage: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold"
                 >
-                  Save Persona
+                  {editingPersonaId ? "Update Persona" : "Save Persona"}
                 </button>
               </div>
             </form>
@@ -196,6 +370,16 @@ export const SettingsPage: React.FC = () => {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm text-white truncate">{p.name}</span>
+                      {p.gender && (
+                        <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-brand-500/15 text-brand-300 border border-brand-500/30">
+                          {p.gender}
+                        </span>
+                      )}
+                      {p.pronounSubject && (
+                        <span className="text-[10px] font-mono text-slate-400">
+                          ({p.pronounSubject}/{p.pronounObject || p.pronounSubject})
+                        </span>
+                      )}
                       {p.isDefault && (
                         <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-white/10 text-slate-300">
                           Default
@@ -205,13 +389,22 @@ export const SettingsPage: React.FC = () => {
                     <p className="text-xs text-slate-400 mt-1 line-clamp-2">{p.description}</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => deletePersona(p.id)}
-                  className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors text-xs flex-shrink-0"
-                >
-                  Delete
-                </button>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => openEditPersona(p)}
+                    className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors text-xs"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deletePersona(p.id)}
+                    className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors text-xs"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>

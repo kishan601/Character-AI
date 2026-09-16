@@ -22,6 +22,15 @@ export const CharacterEditPage: React.FC = () => {
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
   const [description, setDescription] = useState("");
+  const [persona, setPersona] = useState("");
+  const [gender, setGender] = useState("");
+  const [pronounPreset, setPronounPreset] = useState("unspecified");
+  const [pronounSubject, setPronounSubject] = useState("");
+  const [pronounObject, setPronounObject] = useState("");
+  const [pronounPossessive, setPronounPossessive] = useState("");
+  const [pronounDeterminer, setPronounDeterminer] = useState("");
+  const [isCustomPronouns, setIsCustomPronouns] = useState(false);
+
   const [greeting, setGreeting] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [exampleDialogue, setExampleDialogue] = useState("");
@@ -34,18 +43,84 @@ export const CharacterEditPage: React.FC = () => {
 
   useEffect(() => {
     if (character) {
-      setName(character.name);
+      setName(character.name || "");
       setTagline(character.tagline || "");
       setDescription(character.description || "");
-      setGreeting(character.greeting);
-      setSystemPrompt(character.systemPrompt);
+      setPersona(character.persona || "");
+      setGreeting(character.greeting || "");
+      setSystemPrompt(character.systemPrompt || "");
       setExampleDialogue(character.exampleDialogue || "");
       setAvatarUrl(character.avatarUrl || null);
       setBackgroundUrl(character.backgroundUrl || null);
       setBgBlur(character.bgBlur ?? 0);
       setBgDim(character.bgDim ?? 40);
+
+      // Populate gender and pronouns
+      const g = character.gender || "";
+      const ps = character.pronounSubject || "";
+      const po = character.pronounObject || "";
+      const pp = character.pronounPossessive || "";
+      const pd = character.pronounDeterminer || "";
+
+      setGender(g);
+      setPronounSubject(ps);
+      setPronounObject(po);
+      setPronounPossessive(pp);
+      setPronounDeterminer(pd);
+
+      if (ps === "she" && po === "her") {
+        setPronounPreset("female");
+        setIsCustomPronouns(false);
+      } else if (ps === "he" && po === "him") {
+        setPronounPreset("male");
+        setIsCustomPronouns(false);
+      } else if (ps === "they" && po === "them") {
+        setPronounPreset("non-binary");
+        setIsCustomPronouns(false);
+      } else if (!ps && !po) {
+        setPronounPreset("unspecified");
+        setIsCustomPronouns(false);
+      } else {
+        setPronounPreset("custom");
+        setIsCustomPronouns(true);
+      }
     }
   }, [character]);
+
+  const handlePresetChange = (preset: string) => {
+    setPronounPreset(preset);
+    if (preset === "female") {
+      setGender("female");
+      setPronounSubject("she");
+      setPronounObject("her");
+      setPronounPossessive("hers");
+      setPronounDeterminer("her");
+      setIsCustomPronouns(false);
+    } else if (preset === "male") {
+      setGender("male");
+      setPronounSubject("he");
+      setPronounObject("him");
+      setPronounPossessive("his");
+      setPronounDeterminer("his");
+      setIsCustomPronouns(false);
+    } else if (preset === "non-binary") {
+      setGender("non-binary");
+      setPronounSubject("they");
+      setPronounObject("them");
+      setPronounPossessive("theirs");
+      setPronounDeterminer("their");
+      setIsCustomPronouns(false);
+    } else if (preset === "unspecified") {
+      setGender("");
+      setPronounSubject("");
+      setPronounObject("");
+      setPronounPossessive("");
+      setPronounDeterminer("");
+      setIsCustomPronouns(false);
+    } else if (preset === "custom") {
+      setIsCustomPronouns(true);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +134,12 @@ export const CharacterEditPage: React.FC = () => {
           name: name.trim(),
           tagline: tagline.trim() || null,
           description: description.trim() || null,
+          persona: persona.trim() || null,
+          gender: gender.trim() || null,
+          pronounSubject: pronounSubject.trim() || null,
+          pronounObject: pronounObject.trim() || null,
+          pronounPossessive: pronounPossessive.trim() || null,
+          pronounDeterminer: pronounDeterminer.trim() || null,
           greeting: greeting.trim(),
           systemPrompt: systemPrompt.trim(),
           exampleDialogue: exampleDialogue.trim() || null,
@@ -95,7 +176,7 @@ export const CharacterEditPage: React.FC = () => {
     <div className="flex-1 flex flex-col min-h-screen bg-dark-950 overflow-y-auto">
       <Header />
 
-      <main className="flex-1 max-w-4xl mx-auto w-full p-4 sm:p-8 pb-32 sm:pb-24 space-y-8">
+      <main className="flex-1 max-w-4xl mx-auto w-full p-4 sm:p-8 space-y-8 pb-[calc(7rem+env(safe-area-inset-bottom,0px))]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
@@ -105,17 +186,20 @@ export const CharacterEditPage: React.FC = () => {
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
-              <h1 className="text-2xl font-bold text-white">Edit Character Definition</h1>
-              <p className="text-xs text-slate-400">Update persona parameters, avatar, and wallpaper</p>
+              <h1 className="text-2xl font-bold text-white">Edit Character</h1>
+              <p className="text-xs text-slate-400">
+                Modify 7-layer identity configuration, pronouns, definition, and appearance.
+              </p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={handleDelete}
-            className="px-3.5 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-500/20 text-xs font-semibold transition-colors"
           >
-            <Trash2 className="w-4 h-4" /> Delete Character
+            <Trash2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Delete Character</span>
           </button>
         </div>
 
@@ -126,20 +210,19 @@ export const CharacterEditPage: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Visuals */}
+          {/* Section 1: Visual Identity */}
           <div className="p-6 rounded-3xl glass-panel border border-white/10 space-y-6">
             <h2 className="text-base font-semibold text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-brand-400" /> Visuals & Wallpaper
+              <Sparkles className="w-4 h-4 text-brand-400" /> Visual Identity & Wallpaper
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="flex flex-col p-4 rounded-2xl bg-dark-900/40 border border-white/5 w-full">
+              <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-dark-900/40 border border-white/5">
                 <ImageUpload
                   type="avatar"
                   currentUrl={avatarUrl}
                   onUploadSuccess={(url) => setAvatarUrl(url)}
-                  label="Profile Avatar"
-                  className="w-full"
+                  label="Avatar"
                 />
               </div>
 
@@ -148,8 +231,7 @@ export const CharacterEditPage: React.FC = () => {
                   type="wallpaper"
                   currentUrl={backgroundUrl}
                   onUploadSuccess={(url) => setBackgroundUrl(url)}
-                  label="Chat Background Wallpaper"
-                  className="w-full"
+                  label="Wallpaper"
                 />
 
                 <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/5">
@@ -187,10 +269,10 @@ export const CharacterEditPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Details */}
+          {/* Section 2: Identity & Pronoun Mapping */}
           <div className="p-6 rounded-3xl glass-panel border border-white/10 space-y-6">
             <h2 className="text-base font-semibold text-white flex items-center gap-2">
-              <Bot className="w-4 h-4 text-purple-400" /> Identity
+              <Bot className="w-4 h-4 text-purple-400" /> Identity & Linguistic Configuration
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -218,13 +300,99 @@ export const CharacterEditPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Gender & Pronoun Configuration */}
+            <div className="p-4 rounded-2xl bg-dark-900/50 border border-white/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-200">
+                    Gender & Linguistic Pronoun Map
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Deterministic pronouns prevent local models from reversing actor and recipient.
+                  </p>
+                </div>
+                <select
+                  value={pronounPreset}
+                  onChange={(e) => handlePresetChange(e.target.value)}
+                  className="px-3 py-1.5 text-xs rounded-xl bg-dark-800 border border-white/10 text-brand-300 focus:outline-none focus:border-brand-500 cursor-pointer"
+                >
+                  <option value="female">Female (she/her/hers)</option>
+                  <option value="male">Male (he/him/his)</option>
+                  <option value="non-binary">Non-Binary (they/them/theirs)</option>
+                  <option value="unspecified">Unspecified / Neutral</option>
+                  <option value="custom">Custom...</option>
+                </select>
+              </div>
+
+              {(isCustomPronouns || pronounPreset !== "unspecified") && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-white/5">
+                  <div>
+                    <label className="block text-[10px] uppercase font-mono text-slate-400 mb-0.5">Subject</label>
+                    <input
+                      type="text"
+                      placeholder="she / he / they"
+                      value={pronounSubject}
+                      onChange={(e) => {
+                        setPronounSubject(e.target.value);
+                        setIsCustomPronouns(true);
+                        setPronounPreset("custom");
+                      }}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-dark-950 border border-white/10 text-slate-200 focus:outline-none focus:border-brand-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-mono text-slate-400 mb-0.5">Object</label>
+                    <input
+                      type="text"
+                      placeholder="her / him / them"
+                      value={pronounObject}
+                      onChange={(e) => {
+                        setPronounObject(e.target.value);
+                        setIsCustomPronouns(true);
+                        setPronounPreset("custom");
+                      }}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-dark-950 border border-white/10 text-slate-200 focus:outline-none focus:border-brand-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-mono text-slate-400 mb-0.5">Possessive</label>
+                    <input
+                      type="text"
+                      placeholder="hers / his / theirs"
+                      value={pronounPossessive}
+                      onChange={(e) => {
+                        setPronounPossessive(e.target.value);
+                        setIsCustomPronouns(true);
+                        setPronounPreset("custom");
+                      }}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-dark-950 border border-white/10 text-slate-200 focus:outline-none focus:border-brand-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-mono text-slate-400 mb-0.5">Determiner</label>
+                    <input
+                      type="text"
+                      placeholder="her / his / their"
+                      value={pronounDeterminer}
+                      onChange={(e) => {
+                        setPronounDeterminer(e.target.value);
+                        setIsCustomPronouns(true);
+                        setPronounPreset("custom");
+                      }}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-dark-950 border border-white/10 text-slate-200 focus:outline-none focus:border-brand-500 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">
                 Opening Greeting
               </label>
               <textarea
                 required
-                rows={4}
+                rows={3}
                 value={greeting}
                 onChange={(e) => setGreeting(e.target.value)}
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-dark-900 border border-white/10 text-white focus:outline-none focus:border-brand-500 font-mono text-xs leading-relaxed"
@@ -232,19 +400,59 @@ export const CharacterEditPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Prompt */}
+          {/* Section 3: Definition, Persona & Instructions */}
           <div className="p-6 rounded-3xl glass-panel border border-white/10 space-y-6">
             <h2 className="text-base font-semibold text-white flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-emerald-400" /> System Instructions
+              <Sliders className="w-4 h-4 text-emerald-400" /> Definition, Persona & Lore
             </h2>
+
+            {/* Layer 1: Canonical Definition */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Layer 1: Canonical Character Definition (Who &#123;&#123;char&#125;&#125; is)
+                </label>
+                <span className="text-[11px] text-brand-400 font-mono">Persistent Core Lore</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mb-2">
+                Define the character's canonical identity, backstory, origin, fixed traits, and core relationship with &#123;&#123;user&#125;&#125;.
+              </p>
+              <textarea
+                rows={3}
+                placeholder="Backstory, origin lore, and fixed traits..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-dark-900 border border-white/10 text-white focus:outline-none focus:border-brand-500 font-mono text-xs leading-relaxed resize-y"
+              />
+            </div>
+
+            {/* Layer 2: Dynamic Persona */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Layer 2: Character Persona & Speaking Demeanor (How &#123;&#123;char&#125;&#125; behaves right now)
+                </label>
+                <span className="text-[11px] text-purple-400 font-mono">Editable Mid-Chat</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mb-2">
+                Define speaking style, current mood, conversational manner, and behavioral quirks.
+              </p>
+              <textarea
+                rows={3}
+                placeholder="Speaking habits, attitude, demeanor..."
+                value={persona}
+                onChange={(e) => setPersona(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-dark-900 border border-white/10 text-white focus:outline-none focus:border-brand-500 font-mono text-xs leading-relaxed resize-y"
+              />
+            </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">
-                System Prompt
+                System Prompt (Directives & Universe Rules)
               </label>
               <textarea
                 required
-                rows={6}
+                rows={4}
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-dark-900 border border-white/10 text-white focus:outline-none focus:border-brand-500 font-mono text-xs leading-relaxed"
@@ -256,7 +464,7 @@ export const CharacterEditPage: React.FC = () => {
                 Example Dialogue
               </label>
               <textarea
-                rows={3}
+                rows={2}
                 value={exampleDialogue}
                 onChange={(e) => setExampleDialogue(e.target.value)}
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-dark-900 border border-white/10 text-white focus:outline-none focus:border-brand-500 font-mono text-xs leading-relaxed"
@@ -264,17 +472,17 @@ export const CharacterEditPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 pb-12">
+          <div className="sticky bottom-4 z-20 flex items-center justify-end gap-3 p-3 sm:p-4 rounded-2xl bg-dark-950/90 border border-white/10 backdrop-blur-xl shadow-2xl">
             <Link
               to="/"
-              className="w-full sm:w-auto text-center px-6 py-3.5 rounded-2xl bg-dark-900 hover:bg-dark-800 text-slate-300 text-xs font-semibold transition-colors flex items-center justify-center border border-white/5"
+              className="px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-dark-900 hover:bg-dark-800 text-slate-300 text-xs font-semibold transition-colors"
             >
               Cancel
             </Link>
             <button
               type="submit"
               disabled={isUpdating}
-              className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-xl shadow-brand-500/25 transition-all flex items-center justify-center disabled:opacity-50"
+              className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-xl shadow-brand-500/25 transition-all flex items-center gap-2"
             >
               {isUpdating ? "Saving Changes..." : "Save Changes"}
             </button>

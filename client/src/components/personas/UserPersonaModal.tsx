@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { X, User, Plus, Check, Trash2, Sparkles } from "lucide-react";
 import {
   useGetPersonasQuery,
@@ -23,6 +24,7 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
   activePersonaId,
   onSelectPersona,
 }) => {
+  const navigate = useNavigate();
   const { data: personas = [], isLoading } = useGetPersonasQuery();
   const [createPersona] = useCreatePersonaMutation();
   const [deletePersona] = useDeletePersonaMutation();
@@ -190,6 +192,17 @@ export const UserPersonaModal: React.FC<UserPersonaModalProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClose();
+                          navigate("/settings");
+                        }}
+                        className="text-[10px] uppercase font-bold tracking-wide text-brand-400 hover:text-brand-300 px-2 py-1 rounded hover:bg-brand-500/10 transition-colors"
+                      >
+                        Edit
+                      </button>
                       {isSelected ? (
                         <div className="p-1.5 rounded-full bg-brand-500 text-white shadow-sm">
                           <Check className="w-3.5 h-3.5" />
