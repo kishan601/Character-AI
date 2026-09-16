@@ -46,3 +46,10 @@ server/uploads/wallpapers/*
 server/uploads/*
 !server/uploads/avatars/
 !server/uploads/wallpapers/
+
+# Temporary Local Notes & Diffs
+UNCOMMITTED_CHANGES.md
+diff_output.txt
+diff_output_utf8.txt
+scratch*.ts
+scratch*.js
