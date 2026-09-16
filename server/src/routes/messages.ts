@@ -78,18 +78,7 @@ messagesRouter.put("/:id", async (req, res, next) => {
       },
     });
 
-    // 2. Soft-delete subsequent messages in this session because context changed
-    const subsequent = await prisma.message.updateMany({
-      where: {
-        sessionId: message.sessionId,
-        orderIndex: { gt: message.orderIndex },
-      },
-      data: {
-        isDeleted: true,
-      },
-    });
-
-    // 3. Lazy memory invalidation: if edited message was already summarized, reset summary boundary
+    // 2. Lazy memory invalidation: if edited message was already summarized, reset summary boundary
     await prisma.chatSession.updateMany({
       where: {
         id: message.sessionId,
@@ -103,7 +92,7 @@ messagesRouter.put("/:id", async (req, res, next) => {
 
     res.json({
       message: { ...updated, swipes: currentSwipes },
-      softDeletedCount: subsequent.count,
+      softDeletedCount: 0,
     });
   } catch (err) {
     next(err);
@@ -154,6 +143,30 @@ messagesRouter.patch("/:id/swipe", async (req, res, next) => {
     });
 
     res.json({ ...updated, swipes });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST batch soft-delete messages
+messagesRouter.post("/batch-delete", async (req, res, next) => {
+  try {
+    const { messageIds } = req.body;
+    if (!Array.isArray(messageIds) || messageIds.length === 0) {
+      res.status(400).json({ error: "messageIds array is required" });
+      return;
+    }
+
+    const result = await prisma.message.updateMany({
+      where: {
+        id: { in: messageIds },
+      },
+      data: {
+        isDeleted: true,
+      },
+    });
+
+    res.json({ success: true, count: result.count });
   } catch (err) {
     next(err);
   }

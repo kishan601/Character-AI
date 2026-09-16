@@ -55,6 +55,12 @@ charactersRouter.post("/", async (req, res, next) => {
       name,
       tagline,
       description,
+      persona,
+      gender,
+      pronounSubject,
+      pronounObject,
+      pronounPossessive,
+      pronounDeterminer,
       greeting,
       systemPrompt,
       exampleDialogue,
@@ -76,6 +82,12 @@ charactersRouter.post("/", async (req, res, next) => {
         name: name.trim(),
         tagline: tagline?.trim() || null,
         description: description?.trim() || null,
+        persona: persona?.trim() || null,
+        gender: gender?.trim() || null,
+        pronounSubject: pronounSubject?.trim() || null,
+        pronounObject: pronounObject?.trim() || null,
+        pronounPossessive: pronounPossessive?.trim() || null,
+        pronounDeterminer: pronounDeterminer?.trim() || null,
         greeting: greeting.trim(),
         systemPrompt: systemPrompt.trim(),
         exampleDialogue: exampleDialogue?.trim() || null,
@@ -99,6 +111,12 @@ charactersRouter.put("/:id", async (req, res, next) => {
       name,
       tagline,
       description,
+      persona,
+      gender,
+      pronounSubject,
+      pronounObject,
+      pronounPossessive,
+      pronounDeterminer,
       greeting,
       systemPrompt,
       exampleDialogue,
@@ -111,12 +129,22 @@ charactersRouter.put("/:id", async (req, res, next) => {
     const character = await prisma.character.update({
       where: { id: req.params.id },
       data: {
-        name: name?.trim(),
+        name: name !== undefined ? name.trim() : undefined,
         tagline: tagline !== undefined ? tagline?.trim() || null : undefined,
         description:
           description !== undefined ? description?.trim() || null : undefined,
-        greeting: greeting?.trim(),
-        systemPrompt: systemPrompt?.trim(),
+        persona: persona !== undefined ? persona?.trim() || null : undefined,
+        gender: gender !== undefined ? gender?.trim() || null : undefined,
+        pronounSubject:
+          pronounSubject !== undefined ? pronounSubject?.trim() || null : undefined,
+        pronounObject:
+          pronounObject !== undefined ? pronounObject?.trim() || null : undefined,
+        pronounPossessive:
+          pronounPossessive !== undefined ? pronounPossessive?.trim() || null : undefined,
+        pronounDeterminer:
+          pronounDeterminer !== undefined ? pronounDeterminer?.trim() || null : undefined,
+        greeting: greeting !== undefined ? greeting.trim() : undefined,
+        systemPrompt: systemPrompt !== undefined ? systemPrompt.trim() : undefined,
         exampleDialogue:
           exampleDialogue !== undefined
             ? exampleDialogue?.trim() || null
