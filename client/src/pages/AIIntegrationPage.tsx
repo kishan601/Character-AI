@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Sparkles, Globe, Key, Check } from "lucide-react";
-import { Header } from "../components/layout/Header.js";
+import { getApiBaseUrl } from "../config.js";
 
 // Hook to manage local storage state easily
 function useLocalState(key: string, defaultValue: string) {
@@ -53,16 +53,18 @@ export const AIIntegrationPage: React.FC = () => {
     setTestStatus("idle");
     
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetch(`${getApiBaseUrl()}/generate/test`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          ...(apiKey ? { "Authorization": `Bearer ${apiKey}` } : {})
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: model || "local-model",
-          messages: [{ role: "user", content: "Hi" }],
-          max_tokens: 5
+          aiConfig: {
+            aiProvider: provider,
+            aiEndpoint: endpoint,
+            aiApiKey: apiKey,
+            aiModel: model,
+          }
         })
       });
 

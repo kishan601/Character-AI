@@ -204,6 +204,39 @@ generationRouter.post("/", async (req, res, next) => {
   }
 });
 
+// POST /api/generate/test (Test API Connection from frontend)
+generationRouter.post("/test", async (req, res) => {
+  const { aiConfig } = req.body;
+  try {
+    // We can't access private baseUrl directly from lmStudioClient instance without exposing it,
+    // so if aiConfig isn't provided we default to the expected URL pattern.
+    const url = aiConfig?.aiEndpoint || "http://127.0.0.1:1234/v1/chat/completions";
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (aiConfig?.aiApiKey) {
+      headers["Authorization"] = `Bearer ${aiConfig.aiApiKey}`;
+    }
+
+    const testRes = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: aiConfig?.aiModel || "local-model",
+        messages: [{ role: "user", content: "Test" }],
+        max_tokens: 5,
+      }),
+    });
+
+    if (testRes.ok) {
+      res.status(200).json({ status: "ok" });
+    } else {
+      const errText = await testRes.text();
+      res.status(testRes.status).json({ error: errText });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Connection failed" });
+  }
+});
+
 // POST /api/generate/regenerate (Generate alternate swipe)
 generationRouter.post("/regenerate", async (req, res, next) => {
   const { sessionId, messageId, maxTokens, model, aiConfig } = req.body;
