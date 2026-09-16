@@ -1,0 +1,79 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Character {
+  id              String         @id @default(cuid())
+  name            String
+  tagline         String?
+  description     String?
+  greeting        String
+  systemPrompt    String
+  exampleDialogue String?
+  avatarUrl       String?
+  backgroundUrl   String?
+  bgBlur          Int            @default(0)
+  bgDim           Int            @default(40)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  sessions        ChatSession[]
+  memories        PinnedMemory[]
+}
+
+model UserPersona {
+  id          String        @id @default(cuid())
+  name        String
+  description String
+  avatarUrl   String?
+  isDefault   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  sessions    ChatSession[]
+}
+
+model ChatSession {
+  id                  String         @id @default(cuid())
+  title               String?
+  characterId         String
+  character           Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  userPersonaId       String?
+  userPersona         UserPersona?   @relation(fields: [userPersonaId], references: [id], onDelete: SetNull)
+  rollingSummary      String?
+  summarizedUpToIndex Int            @default(0)
+  preferredMaxTokens  Int            @default(400)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  messages            Message[]
+  memories            PinnedMemory[]
+}
+
+model Message {
+  id               String       @id @default(cuid())
+  sessionId        String
+  session          ChatSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  orderIndex       Int
+  sender           String       // "user" | "assistant"
+  swipes           String       @default("[]") // JSON stringified array of strings for sqlite compatibility
+  activeSwipeIndex Int          @default(0)
+  isDeleted        Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([sessionId, orderIndex])
+}
+
+model PinnedMemory {
+  id          String       @id @default(cuid())
+  characterId String
+  character   Character    @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  sessionId   String?
+  session     ChatSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  content     String
+  label       String?
+  createdAt   DateTime     @default(now())
+}
