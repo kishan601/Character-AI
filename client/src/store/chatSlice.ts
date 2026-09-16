@@ -4,14 +4,21 @@ interface ChatState {
   activeSessionId: string | null;
   activeCharacterId: string | null;
   currentMaxTokens: number;
+  bubbleOpacity: number;
   isStreaming: boolean;
   streamingContent: string;
 }
+
+const savedOpacity = typeof window !== "undefined" ? localStorage.getItem("bubbleOpacity") : null;
+const initialOpacity = savedOpacity !== null && !isNaN(parseInt(savedOpacity, 10))
+  ? Math.max(0, Math.min(100, parseInt(savedOpacity, 10)))
+  : 70;
 
 const initialState: ChatState = {
   activeSessionId: null,
   activeCharacterId: null,
   currentMaxTokens: 400,
+  bubbleOpacity: initialOpacity,
   isStreaming: false,
   streamingContent: "",
 };
@@ -28,6 +35,12 @@ export const chatSlice = createSlice({
     },
     setMaxTokens: (state, action: PayloadAction<number>) => {
       state.currentMaxTokens = action.payload;
+    },
+    setBubbleOpacity: (state, action: PayloadAction<number>) => {
+      state.bubbleOpacity = action.payload;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("bubbleOpacity", String(action.payload));
+      }
     },
     setIsStreaming: (state, action: PayloadAction<boolean>) => {
       state.isStreaming = action.payload;
@@ -49,6 +62,7 @@ export const {
   setActiveSessionId,
   setActiveCharacterId,
   setMaxTokens,
+  setBubbleOpacity,
   setIsStreaming,
   appendStreamingToken,
   clearStreaming,
