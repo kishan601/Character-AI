@@ -1,0 +1,14 @@
+{
+  "name": "character-ai-workspace",
+  "version": "1.0.0",
+  "description": "Local & Uncensored Character.ai clone with LM Studio, React, Node.js, and Neon Postgres",
+  "scripts": {
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"cyan,magenta\" \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix server run build && npm --prefix client run build"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
