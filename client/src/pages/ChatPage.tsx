@@ -205,27 +205,15 @@ export const ChatPage: React.FC = () => {
 
   return (
     <div className="relative flex-1 flex flex-col h-full overflow-hidden bg-dark-950">
-      {/* 1. Fullscreen Wallpaper Background (Portrait preserved on desktop, cover on mobile) */}
+      {/* 1. Fullscreen Wallpaper Background (Fills entire screen on all devices) */}
       {character.backgroundUrl && (
-        <>
-          {/* Ambient blurred backdrop on desktop to softly fill wide margins */}
-          <div
-            className="hidden md:block absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-all duration-700 pointer-events-none select-none opacity-40 scale-105"
-            style={{
-              backgroundImage: `url(${character.backgroundUrl})`,
-              filter: "blur(40px)",
-            }}
-          />
-
-          {/* Main Wallpaper: Full cover on mobile, portrait contain on desktop */}
-          <div
-            className="absolute inset-0 z-0 bg-cover md:bg-contain bg-center bg-no-repeat transition-all duration-700 pointer-events-none select-none"
-            style={{
-              backgroundImage: `url(${character.backgroundUrl})`,
-              filter: character.bgBlur ? `blur(${character.bgBlur}px)` : "none",
-            }}
-          />
-        </>
+        <div
+          className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-all duration-700 pointer-events-none select-none"
+          style={{
+            backgroundImage: `url(${character.backgroundUrl})`,
+            filter: character.bgBlur ? `blur(${character.bgBlur}px)` : "none",
+          }}
+        />
       )}
 
       {/* Dimming Overlay */}
