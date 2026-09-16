@@ -14,7 +14,7 @@ export const generationRouter = Router();
 
 // POST /api/generate (SSE Streaming)
 generationRouter.post("/", async (req, res, next) => {
-  const { sessionId, userMessage, maxTokens, model, goOn } = req.body;
+  const { sessionId, userMessage, maxTokens, model, goOn, aiConfig } = req.body;
   const isGoOn = Boolean(goOn);
 
   if (!sessionId || (!isGoOn && !userMessage?.trim())) {
@@ -139,6 +139,7 @@ generationRouter.post("/", async (req, res, next) => {
         frequencyPenalty: 0.2,
         seed: Math.floor(Math.random() * 100000000),
         model,
+        aiConfig,
         stop: stopTokens,
         signal: abortController.signal,
         onToken: (token) => {
@@ -205,7 +206,7 @@ generationRouter.post("/", async (req, res, next) => {
 
 // POST /api/generate/regenerate (Generate alternate swipe)
 generationRouter.post("/regenerate", async (req, res, next) => {
-  const { sessionId, messageId, maxTokens, model } = req.body;
+  const { sessionId, messageId, maxTokens, model, aiConfig } = req.body;
 
   if (!sessionId || !messageId) {
     res.status(400).json({ error: "sessionId and messageId are required." });
@@ -297,6 +298,7 @@ generationRouter.post("/regenerate", async (req, res, next) => {
         frequencyPenalty: dynamicFrequencyPenalty,
         seed: dynamicSeed,
         model,
+        aiConfig,
         stop: stopTokens,
         signal: abortController.signal,
         onToken: (token) => {

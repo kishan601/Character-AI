@@ -9,6 +9,13 @@ interface UseStreamChatOptions {
   onDone?: () => void;
 }
 
+const getAiConfig = () => ({
+  aiProvider: localStorage.getItem("ai_provider") || "Custom",
+  aiEndpoint: localStorage.getItem("ai_endpoint") || "http://192.168.29.240:1234/v1/chat/completions",
+  aiApiKey: localStorage.getItem("ai_api_key") || "",
+  aiModel: localStorage.getItem("ai_model") || "liquid/lfm2.5-1.2b"
+});
+
 export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
@@ -52,6 +59,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
             sessionId,
             userMessage: userText.trim(),
             maxTokens,
+            aiConfig: getAiConfig(),
           }),
           signal: controller.signal,
         });
@@ -174,6 +182,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
             sessionId,
             goOn: true,
             maxTokens,
+            aiConfig: getAiConfig(),
           }),
           signal: controller.signal,
         });
@@ -276,6 +285,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
             sessionId,
             messageId,
             maxTokens,
+            aiConfig: getAiConfig(),
           }),
           signal: controller.signal,
         });

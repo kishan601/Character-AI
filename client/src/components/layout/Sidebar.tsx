@@ -273,12 +273,18 @@ export const Sidebar: React.FC = () => {
         </div>
 
         {/* Bottom Bar: Settings */}
-        <div className="p-3 border-t border-white/10 bg-dark-950/40 flex-shrink-0">
+        <div className="p-3 border-t border-white/10 bg-dark-950/40 flex-shrink-0 flex flex-col gap-1">
+          <Link
+            to="/settings/ai"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[#d9904d] hover:text-[#f4f3f0] hover:bg-white/5 transition-colors"
+          >
+            <Sparkles className="w-4 h-4" /> AI Integration Settings
+          </Link>
           <Link
             to="/settings"
             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
           >
-            <Settings className="w-4 h-4" /> App & LM Studio Settings
+            <Settings className="w-4 h-4" /> App & Database Settings
           </Link>
         </div>
         </div>

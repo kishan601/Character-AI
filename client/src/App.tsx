@@ -8,6 +8,7 @@ import { ChatPage } from "./pages/ChatPage.js";
 import { CharacterCreatePage } from "./pages/CharacterCreatePage.js";
 import { CharacterEditPage } from "./pages/CharacterEditPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
+import { AIIntegrationPage } from "./pages/AIIntegrationPage.js";
 import { GlobalPersonaModal } from "./components/personas/GlobalPersonaModal.js";
 
 export const App: React.FC = () => {
@@ -30,6 +31,7 @@ export const App: React.FC = () => {
               <Route path="/characters/new" element={<CharacterCreatePage />} />
               <Route path="/characters/:id/edit" element={<CharacterEditPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings/ai" element={<AIIntegrationPage />} />
             </Routes>
           </div>
         </div>

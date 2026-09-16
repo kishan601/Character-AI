@@ -63,13 +63,26 @@ export class LMStudioClient {
     presencePenalty?: number;
     frequencyPenalty?: number;
     seed?: number;
+    seed?: number;
     model?: string;
+    aiConfig?: {
+      aiEndpoint: string;
+      aiApiKey: string;
+      aiProvider: string;
+      aiModel: string;
+    };
   }): Promise<string> {
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+    const url = params.aiConfig?.aiEndpoint || `${this.baseUrl}/chat/completions`;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (params.aiConfig?.aiApiKey) {
+      headers["Authorization"] = `Bearer ${params.aiConfig.aiApiKey}`;
+    }
+
+    const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
-        model: params.model || "local-model",
+        model: params.aiConfig?.aiModel || params.model || "local-model",
         messages: params.messages,
         max_tokens: params.maxTokens || 400,
         max_completion_tokens: params.maxTokens || 400,
@@ -99,16 +112,29 @@ export class LMStudioClient {
     presencePenalty?: number;
     frequencyPenalty?: number;
     seed?: number;
+    seed?: number;
     model?: string;
     stop?: string[];
     signal?: AbortSignal;
     onToken: (token: string) => void;
+    aiConfig?: {
+      aiEndpoint: string;
+      aiApiKey: string;
+      aiProvider: string;
+      aiModel: string;
+    };
   }): Promise<string> {
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+    const url = params.aiConfig?.aiEndpoint || `${this.baseUrl}/chat/completions`;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (params.aiConfig?.aiApiKey) {
+      headers["Authorization"] = `Bearer ${params.aiConfig.aiApiKey}`;
+    }
+
+    const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
-        model: params.model || "local-model",
+        model: params.aiConfig?.aiModel || params.model || "local-model",
         messages: params.messages,
         max_tokens: params.maxTokens || 400,
         max_completion_tokens: params.maxTokens || 400,
