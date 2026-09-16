@@ -9,7 +9,7 @@ interface UiState {
 
 const initialState: UiState = {
   zenMode: false,
-  sidebarOpen: true,
+  sidebarOpen: typeof window !== "undefined" ? window.innerWidth >= 768 : false,
   memoryDrawerOpen: false,
   personaModalOpen: false,
 };

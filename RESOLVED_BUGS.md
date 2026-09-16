@@ -177,8 +177,15 @@
 ### Bug 18: Android WebView Mixed Content Blocking (Root Cause of ALL Connection Failures)
 * **The Issue:** Every API request from the installed APK showed `blocked:mixed-content` in DevTools — characters, sessions, health, and chat generation all silently failed. The app appeared completely broken.
 * **Root Cause:** Capacitor serves the app from `http://localhost` inside Android WebView. Android treats `http://localhost` as a **secure origin** (equivalent to HTTPS on desktop). Any outbound `fetch()` to `http://192.168.x.x:3001` (plain HTTP to an external LAN IP) was classified as mixed content and blocked at the OS level — before even touching the network. This is governed by Android's `MIXED_CONTENT_COMPATIBILITY_MODE` default.
-* **The Fix:** Added `android.allowMixedContent: true` to `client/capacitor.config.ts`, setting the WebView to `MIXED_CONTENT_ALWAYS_ALLOW` mode — equivalent to a regular browser's behavior.
-* **Commit:** `833351b`
+* **First Attempt (Insufficient):** Added `android.allowMixedContent: true` to `client/capacitor.config.ts`. This is supposed to set the WebView mode via Capacitor's bridge config, but the config-to-Java translation path silently failed — the setting was never applied at runtime. Commit `833351b`.
+* **Actual Fix:** Overrode `onCreate()` in `MainActivity.java` to directly call `WebSettings.MIXED_CONTENT_ALWAYS_ALLOW` on the WebView instance at the native OS level — bypassing all Capacitor config parsing entirely. This is guaranteed to apply on every app launch.
+  ```java
+  WebView webView = getBridge().getWebView();
+  if (webView != null) {
+      webView.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+  }
+  ```
+* **Commit:** `7a8126d`
 
 ### Bug 19: Windows Firewall Blocking Port 3001
 * **The Issue:** The Android phone could not reach the Node.js backend at `192.168.29.240:3001` — all connection attempts timed out silently even though both devices were on the same Wi-Fi.

@@ -13,7 +13,7 @@ export const CharacterEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data: character, isLoading } = useGetCharacterQuery(id || "", {
+  const { data: character, isLoading, isError } = useGetCharacterQuery(id || "", {
     skip: !id,
   });
   const [updateCharacter, { isLoading: isUpdating }] = useUpdateCharacterMutation();
@@ -168,6 +168,26 @@ export const CharacterEditPage: React.FC = () => {
     return (
       <div className="flex-1 flex items-center justify-center min-h-screen bg-dark-950 text-slate-400">
         Loading character details...
+      </div>
+    );
+  }
+
+  if (!character || isError) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-dark-950 text-slate-400 gap-4 p-6 text-center">
+        <Bot className="w-12 h-12 text-slate-600" />
+        <div>
+          <h2 className="text-lg font-bold text-white mb-1">Character Not Found</h2>
+          <p className="text-xs text-slate-500 max-w-sm">
+            This character may have been deleted or the ID is invalid.
+          </p>
+        </div>
+        <Link
+          to="/"
+          className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold shadow-lg shadow-brand-500/20 transition-all flex items-center gap-2"
+        >
+          <ArrowLeft className="w-4 h-4" /> Return to Characters
+        </Link>
       </div>
     );
   }

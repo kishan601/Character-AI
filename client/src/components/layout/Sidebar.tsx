@@ -115,15 +115,15 @@ export const Sidebar: React.FC = () => {
 
       {/* Sidebar Panel with Smooth Desktop & Mobile Collapse */}
       <aside
-        className={`fixed md:relative inset-y-0 left-0 z-40 glass-panel border-r border-white/10 flex flex-col transition-all duration-300 ease-in-out bg-dark-950/95 flex-shrink-0 pt-[env(safe-area-inset-top)] ${
+        className={`fixed md:relative inset-y-0 left-0 z-40 glass-panel border-r border-white/10 flex flex-col transition-all duration-300 ease-in-out bg-dark-950/95 flex-shrink-0 pt-[calc(4rem+max(env(safe-area-inset-top,0px),1.5rem))] md:pt-0 ${
           sidebarOpen
             ? "w-64 translate-x-0 opacity-100"
             : "w-0 -translate-x-full md:w-0 md:translate-x-0 opacity-0 pointer-events-none md:border-r-0 overflow-hidden"
         }`}
       >
         <div className="w-64 flex flex-col h-full">
-          {/* Brand Header: Exactly h-16 to align seamlessly with Navbar seam */}
-          <div className="h-16 px-4 border-b border-white/10 flex items-center justify-between flex-shrink-0">
+          {/* Brand Header: Shown on Desktop to align seamlessly with Navbar seam */}
+          <div className="hidden md:flex h-16 px-4 border-b border-white/10 items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -149,7 +149,7 @@ export const Sidebar: React.FC = () => {
             <button
               type="button"
               onClick={() => dispatch(setSidebarOpen(false))}
-              className="md:hidden p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+              className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -159,11 +159,12 @@ export const Sidebar: React.FC = () => {
           <div className="p-3 flex-shrink-0">
             <Link
               to="/characters/new"
+              onClick={() => dispatch(setSidebarOpen(false))}
               className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white text-xs font-semibold shadow-lg shadow-brand-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <PlusCircle className="w-4 h-4" /> Create New Character
-          </Link>
-        </div>
+            >
+              <PlusCircle className="w-4 h-4" /> Create New Character
+            </Link>
+          </div>
 
         {/* Scrollable Navigation */}
         <div className="flex-1 overflow-y-auto px-3 py-2 space-y-6">

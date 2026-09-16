@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Menu,
+  ArrowLeft,
   Bookmark,
   User,
   RotateCw,
@@ -57,6 +58,7 @@ export const Header: React.FC<HeaderProps> = ({
   isDeleteMode = false,
 }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const zenMode = useSelector((state: RootState) => state.ui.zenMode);
   const sidebarOpen = useSelector((state: RootState) => state.ui.sidebarOpen);
 
@@ -115,17 +117,65 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header
-      className={`relative z-40 w-full min-h-[4rem] sm:min-h-[4rem] sm:h-16 flex-shrink-0 border-b transition-all duration-300 flex items-center justify-between px-3 sm:px-6 pb-2 sm:pb-0 pt-[max(env(safe-area-inset-top),1.5rem)] sm:pt-[env(safe-area-inset-top)] ${
+      className={`relative z-50 w-full min-h-[4rem] sm:min-h-[4rem] sm:h-16 flex-shrink-0 border-b transition-all duration-300 flex items-center justify-between px-3 sm:px-6 pb-2 sm:pb-0 pt-[max(env(safe-area-inset-top),1.5rem)] sm:pt-[env(safe-area-inset-top)] ${
         zenMode
           ? "opacity-0 pointer-events-none -translate-y-4"
           : "opacity-100 glass-panel border-white/10 shadow-lg"
       }`}
     >
-      {/* Left side: Sidebar Toggle & Character Identity */}
+      {/* Left side: Sidebar Toggle / Back Navigation & Identity */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-        {/* Show Hamburger & Logo in Navbar when Sidebar is COLLAPSED */}
-        {!sidebarOpen && (
-          <div className="flex items-center gap-1.5 sm:gap-2.5 mr-1 flex-shrink-0">
+        {character || showChatControls ? (
+          /* Chat Screen: Back Button + Character Profile Trigger */
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate("/");
+                }
+              }}
+              className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors flex-shrink-0"
+              title="Back to Characters"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+
+            {character && (
+              <button
+                type="button"
+                onClick={onOpenCharacterProfile}
+                className="flex items-center gap-2 group py-1 px-1.5 sm:px-2 rounded-xl hover:bg-white/5 transition-all text-left min-w-0"
+                title="Open Character Dossier & Past Chat History"
+              >
+                {character.avatarUrl && (
+                  <img
+                    src={character.avatarUrl}
+                    alt=""
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-white/10 group-hover:border-brand-400 transition-colors flex-shrink-0"
+                  />
+                )}
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className="font-semibold text-sm text-slate-100 group-hover:text-brand-300 transition-colors truncate max-w-[130px] xs:max-w-[170px] sm:max-w-xs">
+                      {character.name}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-brand-300 transition-colors flex-shrink-0" />
+                  </div>
+                  {character.tagline && (
+                    <span className="text-[10px] text-slate-400 hidden md:inline truncate max-w-xs">
+                      {character.tagline}
+                    </span>
+                  )}
+                </div>
+              </button>
+            )}
+          </div>
+        ) : (
+          /* Default Screen (Home/Settings/etc.): Hamburger + Logo + App Title */
+          <div className="flex items-center gap-2 sm:gap-3 mr-1 flex-shrink-0">
             <button
               type="button"
               onClick={() => dispatch(toggleSidebar())}
@@ -135,57 +185,14 @@ export const Header: React.FC<HeaderProps> = ({
               <Menu className="w-5 h-5" />
             </button>
 
-            {/* Logo shown on desktop, or on mobile only if no character is active */}
-            <Link
-              to="/"
-              className={`items-center gap-2 group ${
-                character ? "hidden sm:flex" : "flex"
-              }`}
-            >
+            <Link to="/" className="flex items-center gap-2 group">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-md shadow-brand-500/20 group-hover:scale-105 transition-transform">
                 Ω
               </div>
-              <span className="font-bold text-base tracking-tight text-white hidden md:inline group-hover:text-brand-300 transition-colors">
+              <span className="font-bold text-base tracking-tight text-white group-hover:text-brand-300 transition-colors">
                 Aegis AI
               </span>
             </Link>
-          </div>
-        )}
-
-        {/* Character Identity & Clickable Profile Drawer Trigger */}
-        {character && (
-          <div
-            className={`flex items-center gap-1.5 sm:gap-2 min-w-0 ${
-              !sidebarOpen ? "pl-2 sm:pl-3 border-l border-white/10" : ""
-            }`}
-          >
-            <button
-              type="button"
-              onClick={onOpenCharacterProfile}
-              className="flex items-center gap-2 group py-1 px-1.5 sm:px-2 rounded-xl hover:bg-white/5 transition-all text-left min-w-0"
-              title="Open Character Dossier & Past Chat History"
-            >
-              {character.avatarUrl && (
-                <img
-                  src={character.avatarUrl}
-                  alt=""
-                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-white/10 group-hover:border-brand-400 transition-colors flex-shrink-0"
-                />
-              )}
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1 min-w-0">
-                  <span className="font-semibold text-sm text-slate-100 group-hover:text-brand-300 transition-colors truncate max-w-[130px] xs:max-w-[170px] sm:max-w-xs">
-                    {character.name}
-                  </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-brand-300 transition-colors flex-shrink-0" />
-                </div>
-                {character.tagline && (
-                  <span className="text-[10px] text-slate-400 hidden md:inline truncate max-w-xs">
-                    {character.tagline}
-                  </span>
-                )}
-              </div>
-            </button>
           </div>
         )}
       </div>

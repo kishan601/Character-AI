@@ -19,7 +19,7 @@ import { ChatInput } from "../components/chat/ChatInput.js";
 import { ZenToggleButton } from "../components/chat/ZenToggleButton.js";
 import { PinnedMemoriesDrawer } from "../components/memory/PinnedMemoriesDrawer.js";
 import { CharacterProfileDrawer } from "../components/characters/CharacterProfileDrawer.js";
-import { setMemoryDrawerOpen } from "../store/uiSlice.js";
+import { setMemoryDrawerOpen, setSidebarOpen } from "../store/uiSlice.js";
 import { setMaxTokens } from "../store/chatSlice.js";
 import { Bot, RefreshCw, Trash2 } from "lucide-react";
 
@@ -27,6 +27,12 @@ export const ChatPage: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      dispatch(setSidebarOpen(false));
+    }
+  }, [sessionId, dispatch]);
 
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
 

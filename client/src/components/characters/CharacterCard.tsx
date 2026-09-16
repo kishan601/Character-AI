@@ -38,14 +38,19 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({ character }) => {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/40 to-transparent" />
 
-        {/* Quick Edit link */}
-        <Link
-          to={`/characters/${character.id}/edit`}
-          className="absolute top-3 right-3 p-2 rounded-xl bg-dark-950/70 hover:bg-dark-900 text-slate-400 hover:text-white border border-white/10 opacity-0 group-hover:opacity-100 transition-all backdrop-blur-md"
+        {/* Quick Edit button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            navigate(`/characters/${character.id}/edit`);
+          }}
+          className="absolute top-3 right-3 p-2 rounded-xl bg-dark-950/70 hover:bg-dark-900 text-slate-400 hover:text-white border border-white/10 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-all backdrop-blur-md z-20"
           title="Edit Character Definition"
         >
           <Settings className="w-4 h-4" />
-        </Link>
+        </button>
       </div>
 
       {/* Avatar & Details */}
