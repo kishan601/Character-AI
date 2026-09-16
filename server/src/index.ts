@@ -70,9 +70,9 @@ app.use("/api/generate", generationRouter);
 // Global Error Handler
 app.use(errorHandler);
 
-app.listen(config.port, () => {
+app.listen(config.port, "0.0.0.0", () => {
   console.log(`=========================================`);
-  console.log(`🚀 Character.ai Server running at http://localhost:${config.port}`);
+  console.log(`🚀 Character.ai Server running at http://0.0.0.0:${config.port}`);
   console.log(`📡 LM Studio URL: ${config.lmStudioUrl}`);
   console.log(`📁 Static uploads served at http://localhost:${config.port}/uploads`);
   console.log(`=========================================`);
