@@ -7,7 +7,7 @@ interface CharacterCardProps {
   character: Character;
 }
 
-export const CharacterCard: React.FC<CharacterCardProps> = ({ character }) => {
+export const CharacterCard: React.FC<CharacterCardProps> = React.memo(({ character }) => {
   const navigate = useNavigate();
   const [resumeSession, { isLoading }] = useResumeSessionMutation();
 
@@ -106,4 +106,11 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({ character }) => {
       </div>
     </div>
   );
-};
+}, (prev, next) =>
+  prev.character.id === next.character.id &&
+  prev.character.name === next.character.name &&
+  prev.character.avatarUrl === next.character.avatarUrl &&
+  prev.character.backgroundUrl === next.character.backgroundUrl &&
+  prev.character.tagline === next.character.tagline &&
+  prev.character._count?.sessions === next.character._count?.sessions
+);
