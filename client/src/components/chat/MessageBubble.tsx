@@ -12,6 +12,7 @@ import {
 import { Message, Character, UserPersona } from "../../api/baseApi.js";
 import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
 import { SwipeControls } from "./SwipeControls.js";
+import { ThinkingIndicator } from "./ThinkingIndicator.js";
 import { RootState } from "../../store/store.js";
 
 interface MessageBubbleProps {
@@ -306,20 +307,12 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
         {/* In-Place Regeneration Card */}
         {isRegeneratingThis ? (
           <div className="py-1 space-y-1.5">
-            <div className="flex items-center gap-1.5 text-brand-300 text-[11px] font-mono animate-pulse">
-              <Sparkles className="w-3 h-3 animate-spin text-brand-400" />
-              <span>Thinking of an alternate response...</span>
-            </div>
             {regeneratingText ? (
               <div className={textContrastClass}>
                 <MarkdownRenderer content={regeneratingText} />
               </div>
             ) : (
-              <div className="h-8 flex items-center gap-1 text-slate-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce" />
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce [animation-delay:0.2s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce [animation-delay:0.4s]" />
-              </div>
+              <ThinkingIndicator />
             )}
           </div>
         ) : isEditing ? (
