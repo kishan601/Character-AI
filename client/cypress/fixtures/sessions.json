@@ -1,0 +1,12 @@
+[
+  {
+    "id": "session-101",
+    "characterId": "char-1",
+    "character": {
+      "name": "Stella the Stargazer",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300"
+    },
+    "lastMessage": "The gravitational lensing around that anomaly is intensifying...",
+    "updatedAt": "2026-09-17T18:30:00.000Z"
+  }
+]

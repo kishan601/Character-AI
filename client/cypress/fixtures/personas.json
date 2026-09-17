@@ -1,0 +1,16 @@
+[
+  {
+    "id": "persona-default",
+    "name": "Default Explorer",
+    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+    "bio": "Curious traveler exploring uncharted dimensions and conversing with unique minds.",
+    "isDefault": true
+  },
+  {
+    "id": "persona-noir",
+    "name": "Detective Miller",
+    "avatar": "https://images.unsplash.com/photo-1628157582853-a796fa650a6a?w=150",
+    "bio": "Gruff, pragmatic investigator from District 9 who speaks straight to the point.",
+    "isDefault": false
+  }
+]
