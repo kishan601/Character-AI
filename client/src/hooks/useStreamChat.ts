@@ -26,16 +26,47 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
   const abortControllerRef = useRef<AbortController | null>(null);
   const dispatch = useDispatch<AppDispatch>();
 
+  const tokenBufferRef = useRef("");
+  const rafIdRef = useRef<number | null>(null);
+
+  const flushTokenBuffer = useCallback(() => {
+    if (tokenBufferRef.current) {
+      const textToAppend = tokenBufferRef.current;
+      tokenBufferRef.current = "";
+      setStreamingText((prev) => prev + textToAppend);
+    }
+    rafIdRef.current = null;
+  }, []);
+
+  const queueToken = useCallback(
+    (token: string) => {
+      tokenBufferRef.current += token;
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(flushTokenBuffer);
+      }
+    },
+    [flushTokenBuffer]
+  );
+
+  const clearTokenBatcher = useCallback(() => {
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    tokenBufferRef.current = "";
+  }, []);
+
   const stopStreaming = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    clearTokenBatcher();
     setIsStreaming(false);
     setStreamingText("");
     setRegeneratingMessageId(null);
     setOptimisticUserMessage(null);
-  }, []);
+  }, [clearTokenBatcher]);
 
   const sendMessage = useCallback(
     async (userText: string, maxTokens?: number) => {
@@ -43,6 +74,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
 
       // 1. Immediately display user message optimistically (Zero Lag!)
       setOptimisticUserMessage(userText.trim());
+      clearTokenBatcher();
       setIsStreaming(true);
       setStreamingText("");
       setStreamError(null);
@@ -106,8 +138,9 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
                 );
                 setOptimisticUserMessage(null);
               } else if (data.type === "token") {
-                setStreamingText((prev) => prev + data.token);
+                queueToken(data.token);
               } else if (data.type === "done") {
+                clearTokenBatcher();
                 // Seamless handoff: Commit messages into cache FIRST before clearing streaming state
                 if (data.message) {
                   dispatch(
@@ -135,6 +168,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
                 onDone?.();
                 return;
               } else if (data.type === "error") {
+                clearTokenBatcher();
                 setStreamError(data.error);
                 setIsStreaming(false);
                 setOptimisticUserMessage(null);
@@ -146,25 +180,28 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
           }
         }
       } catch (err: any) {
+        clearTokenBatcher();
         if (err.name === "AbortError") {
           console.log("Chat stream aborted by user.");
         } else {
           setStreamError(err.message || "Failed to stream chat.");
         }
       } finally {
+        clearTokenBatcher();
         setIsStreaming(false);
         setStreamingText("");
         setOptimisticUserMessage(null);
         abortControllerRef.current = null;
       }
     },
-    [sessionId, isStreaming, dispatch, onDone]
+    [sessionId, isStreaming, dispatch, onDone, queueToken, clearTokenBatcher]
   );
 
   const goOn = useCallback(
     async (maxTokens?: number) => {
       if (isStreaming) return;
 
+      clearTokenBatcher();
       setIsStreaming(true);
       setStreamingText("");
       setStreamError(null);
@@ -217,8 +254,9 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
               const data = JSON.parse(jsonStr);
 
               if (data.type === "token") {
-                setStreamingText((prev) => prev + data.token);
+                queueToken(data.token);
               } else if (data.type === "done") {
+                clearTokenBatcher();
                 // Seamless handoff: Commit assistant message into cache FIRST
                 if (data.message) {
                   dispatch(
@@ -239,6 +277,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
                 onDone?.();
                 return;
               } else if (data.type === "error") {
+                clearTokenBatcher();
                 setStreamError(data.error);
                 setIsStreaming(false);
                 return;
@@ -249,18 +288,20 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
           }
         }
       } catch (err: any) {
+        clearTokenBatcher();
         if (err.name === "AbortError") {
           console.log("Chat continuation stream aborted by user.");
         } else {
           setStreamError(err.message || "Failed to continue story.");
         }
       } finally {
+        clearTokenBatcher();
         setIsStreaming(false);
         setStreamingText("");
         abortControllerRef.current = null;
       }
     },
-    [sessionId, isStreaming, dispatch, onDone]
+    [sessionId, isStreaming, dispatch, onDone, queueToken, clearTokenBatcher]
   );
 
   const regenerateMessage = useCallback(
@@ -269,6 +310,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
 
       // Mark the exact message being regenerated for in-place reload card
       setRegeneratingMessageId(messageId);
+      clearTokenBatcher();
       setIsStreaming(true);
       setStreamingText("");
       setStreamError(null);
@@ -320,8 +362,9 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
               const data = JSON.parse(jsonStr);
 
               if (data.type === "token") {
-                setStreamingText((prev) => prev + data.token);
+                queueToken(data.token);
               } else if (data.type === "done") {
+                clearTokenBatcher();
                 // Seamless in-place swipe update in cache FIRST
                 if (data.message) {
                   dispatch(
@@ -341,6 +384,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
                 onDone?.();
                 return;
               } else if (data.type === "error") {
+                clearTokenBatcher();
                 setStreamError(data.error);
                 setIsStreaming(false);
                 setRegeneratingMessageId(null);
@@ -352,19 +396,21 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
           }
         }
       } catch (err: any) {
+        clearTokenBatcher();
         if (err.name === "AbortError") {
           console.log("Regeneration stream aborted.");
         } else {
           setStreamError(err.message || "Failed to regenerate.");
         }
       } finally {
+        clearTokenBatcher();
         setIsStreaming(false);
         setStreamingText("");
         setRegeneratingMessageId(null);
         abortControllerRef.current = null;
       }
     },
-    [sessionId, isStreaming, dispatch, onDone]
+    [sessionId, isStreaming, dispatch, onDone, queueToken, clearTokenBatcher]
   );
 
   return {

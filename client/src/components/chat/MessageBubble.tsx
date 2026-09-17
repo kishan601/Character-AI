@@ -31,7 +31,7 @@ interface MessageBubbleProps {
   onPinMemory: (content: string) => Promise<void>;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({
+const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   message,
   character,
   userPersona,
@@ -375,3 +375,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     </div>
   );
 };
+
+export const MessageBubble = React.memo(
+  MessageBubbleComponent,
+  (prevProps, nextProps) => {
+    if (prevProps.message.id !== nextProps.message.id) return false;
+    if (prevProps.message.activeSwipeIndex !== nextProps.message.activeSwipeIndex) return false;
+    if (prevProps.message.swipes?.length !== nextProps.message.swipes?.length) return false;
+    const prevContent = prevProps.message.swipes?.[prevProps.message.activeSwipeIndex];
+    const nextContent = nextProps.message.swipes?.[nextProps.message.activeSwipeIndex];
+    if (prevContent !== nextContent) return false;
+    if (prevProps.isLastAssistant !== nextProps.isLastAssistant) return false;
+    if (prevProps.isDeleteMode !== nextProps.isDeleteMode) return false;
+    if (prevProps.isSelected !== nextProps.isSelected) return false;
+    if (prevProps.isRegeneratingThis !== nextProps.isRegeneratingThis) return false;
+    if (prevProps.regeneratingText !== nextProps.regeneratingText) return false;
+    if (prevProps.character.avatarUrl !== nextProps.character.avatarUrl) return false;
+    if (prevProps.character.name !== nextProps.character.name) return false;
+    if (prevProps.userPersona?.name !== nextProps.userPersona?.name) return false;
+    return true;
+  }
+);
+MessageBubble.displayName = "MessageBubble";

@@ -33,6 +33,8 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({ character }) => {
           <img
             src={character.backgroundUrl}
             alt={character.name}
+            decoding="async"
+            loading="lazy"
             className="w-full h-full object-cover opacity-60 group-hover:scale-105 group-hover:opacity-75 transition-all duration-500"
           />
         )}
@@ -60,6 +62,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({ character }) => {
             <img
               src={character.avatarUrl}
               alt={character.name}
+              decoding="async"
               className="w-16 h-16 rounded-2xl object-cover border-2 border-brand-500/40 shadow-xl ring-4 ring-dark-950 group-hover:border-brand-400 transition-colors"
             />
           ) : (

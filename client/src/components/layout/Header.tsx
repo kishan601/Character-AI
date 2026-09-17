@@ -80,10 +80,26 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, [isMenuOpen]);
 
-  // Poll LM Studio connection every 15 seconds
-  const { data: health } = useGetHealthQuery(undefined, {
-    pollingInterval: 15000,
+  // Lifecycle-aware health polling: pause when app is backgrounded/locked to conserve battery
+  const [isAppVisible, setIsAppVisible] = useState(() =>
+    typeof document !== "undefined" ? document.visibilityState === "visible" : true
+  );
+
+  const { data: health, refetch: refetchHealth } = useGetHealthQuery(undefined, {
+    pollingInterval: isAppVisible ? 15000 : 0,
   });
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      const visible = document.visibilityState === "visible";
+      setIsAppVisible(visible);
+      if (visible) {
+        refetchHealth();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [refetchHealth]);
 
   // Query personas if userPersona is not explicitly provided
   const { data: personas = [] } = useGetPersonasQuery(undefined, {

@@ -1,13 +1,65 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Search, PlusCircle, Sparkles, Bot, ShieldCheck } from "lucide-react";
-import { useGetCharactersQuery } from "../api/baseApi.js";
+import { Search, PlusCircle, Sparkles, Bot, ShieldCheck, RotateCw } from "lucide-react";
+import { useGetCharactersQuery, useGetSessionsQuery } from "../api/baseApi.js";
 import { CharacterCard } from "../components/characters/CharacterCard.js";
 import { Header } from "../components/layout/Header.js";
 
 export const HomePage: React.FC = () => {
-  const { data: characters = [], isLoading } = useGetCharactersQuery();
+  const { data: characters = [], isLoading, refetch: refetchCharacters } = useGetCharactersQuery();
+  const { refetch: refetchSessions } = useGetSessionsQuery();
   const [search, setSearch] = useState("");
+
+  // Pull-down to refresh state
+  const [pullY, setPullY] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStartRef = useRef<{ y: number; x: number }>({ y: 0, x: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (containerRef.current && containerRef.current.scrollTop <= 0) {
+      touchStartRef.current = {
+        y: e.touches[0].clientY,
+        x: e.touches[0].clientX,
+      };
+    } else {
+      touchStartRef.current = { y: 0, x: 0 };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (isRefreshing || touchStartRef.current.y === 0) return;
+    if (containerRef.current && containerRef.current.scrollTop <= 0) {
+      const deltaY = e.touches[0].clientY - touchStartRef.current.y;
+      const deltaX = Math.abs(e.touches[0].clientX - touchStartRef.current.x);
+
+      // Only engage if movement is predominantly vertical downward
+      if (deltaY > 0 && deltaY > deltaX) {
+        const damped = Math.min(deltaY * 0.42, 75);
+        setPullY(damped);
+      } else {
+        setPullY(0);
+      }
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (pullY >= 48 && !isRefreshing) {
+      setIsRefreshing(true);
+      setPullY(48);
+      try {
+        await Promise.all([refetchCharacters(), refetchSessions()]);
+      } catch (err) {
+        console.error("Failed to refresh characters:", err);
+      } finally {
+        setIsRefreshing(false);
+        setPullY(0);
+      }
+    } else {
+      setPullY(0);
+    }
+    touchStartRef.current = { y: 0, x: 0 };
+  };
 
   const filtered = characters.filter(
     (c) =>
@@ -17,8 +69,32 @@ export const HomePage: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-dark-950 overflow-y-auto">
+    <div
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="flex-1 flex flex-col min-h-screen bg-dark-950 overflow-y-auto"
+    >
       <Header />
+
+      {/* Pull-down Refresh Indicator */}
+      {(pullY > 0 || isRefreshing) && (
+        <div
+          className="w-full flex justify-center py-2 transition-all duration-150 overflow-hidden pointer-events-none z-30"
+          style={{ height: isRefreshing ? 42 : pullY }}
+        >
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-dark-900/90 border border-brand-500/30 text-brand-300 text-xs shadow-lg backdrop-blur-md">
+            <RotateCw
+              className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-brand-400" : ""}`}
+              style={{ transform: isRefreshing ? undefined : `rotate(${pullY * 4.5}deg)` }}
+            />
+            <span className="font-medium text-[11px]">
+              {isRefreshing ? "Refreshing..." : pullY >= 48 ? "Release to refresh" : "Pull down to refresh"}
+            </span>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 max-w-7xl mx-auto w-full p-6 sm:p-8 space-y-8">
         {/* Hero Section */}
