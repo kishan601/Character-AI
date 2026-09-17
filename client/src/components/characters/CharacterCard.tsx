@@ -24,6 +24,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = React.memo(({ charact
 
   return (
     <div
+      data-testid="character-card"
       onClick={handleStartChat}
       style={{ willChange: "transform" }}
       className="group relative rounded-3xl overflow-hidden bg-dark-900/85 hover:bg-dark-900/95 border border-white/10 hover:border-brand-500/40 transition-all duration-300 hover:shadow-2xl hover:shadow-brand-950/40 flex flex-col h-full cursor-pointer"

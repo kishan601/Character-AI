@@ -142,6 +142,7 @@ export const HomePage: React.FC = () => {
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
+              data-testid="search-input"
               type="text"
               placeholder="Search characters by name, genre, or keyword..."
               value={search}
@@ -169,7 +170,7 @@ export const HomePage: React.FC = () => {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div data-testid="character-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filtered.map((char) => (
               <CharacterCard key={char.id} character={char} />
             ))}
