@@ -25,7 +25,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = React.memo(({ charact
   return (
     <div
       onClick={handleStartChat}
-      style={{ contentVisibility: "auto", containIntrinsicSize: "0 340px" }}
+      style={{ willChange: "transform" }}
       className="group relative rounded-3xl overflow-hidden bg-dark-900/85 hover:bg-dark-900/95 border border-white/10 hover:border-brand-500/40 transition-all duration-300 hover:shadow-2xl hover:shadow-brand-950/40 flex flex-col h-full cursor-pointer"
     >
       {/* Background Wallpaper Banner */}
@@ -36,7 +36,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = React.memo(({ charact
             alt={character.name}
             decoding="async"
             loading="lazy"
-            className="w-full h-full object-cover opacity-60 group-hover:scale-105 group-hover:opacity-75 transition-all duration-500"
+            className="w-full h-full object-cover opacity-60 group-hover:scale-105 group-hover:opacity-75 transition-[transform,opacity] duration-500"
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/40 to-transparent" />
