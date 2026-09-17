@@ -142,8 +142,9 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Left side: Sidebar Toggle / Back Navigation & Identity */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {character || showChatControls ? (
-          /* Chat Screen: Back Button + Character Profile Trigger */
+          /* Chat Screen: Back Button (Mobile Only) / Sidebar Toggle (Desktop) + Character Profile Trigger */
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            {/* Back button: Visible on mobile view ONLY, hidden on PC */}
             <button
               type="button"
               onClick={() => {
@@ -153,10 +154,20 @@ export const Header: React.FC<HeaderProps> = ({
                   navigate("/");
                 }
               }}
-              className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors flex-shrink-0"
+              className="md:hidden p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors flex-shrink-0"
               title="Back to Characters"
             >
               <ArrowLeft className="w-5 h-5" />
+            </button>
+
+            {/* Desktop Sidebar Toggle: On PC, toggle the overlay sidebar */}
+            <button
+              type="button"
+              onClick={() => dispatch(toggleSidebar())}
+              className="hidden md:flex p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors flex-shrink-0"
+              title="Toggle Sidebar"
+            >
+              <Menu className="w-5 h-5" />
             </button>
 
             {character && (
