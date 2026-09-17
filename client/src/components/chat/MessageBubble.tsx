@@ -125,6 +125,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   if (!isAssistant) {
     return (
       <div
+        data-testid="message-bubble"
         className={`flex justify-end items-center w-full animate-in fade-in duration-150 gap-2 ${
           isDeleteMode ? "cursor-pointer" : ""
         }`}
@@ -218,7 +219,8 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   // ASSISTANT MESSAGE: Compressed & compact bubble
   return (
     <div
-      className={`flex justify-start items-center w-full animate-in fade-in duration-150 gap-2 ${
+      data-testid="message-bubble"
+      className={`flex items-start gap-2.5 w-full animate-in fade-in duration-150 relative ${
         isDeleteMode ? "cursor-pointer" : ""
       }`}
       onClick={isDeleteMode ? () => onToggleSelect?.(message.id) : undefined}

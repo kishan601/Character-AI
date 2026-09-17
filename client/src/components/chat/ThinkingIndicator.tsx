@@ -41,6 +41,7 @@ export const ThinkingIndicator: React.FC<ThinkingIndicatorProps> = ({
 
   return (
     <div
+      data-testid="thinking-indicator"
       className={`inline-flex items-center gap-2 py-1 px-1 select-none ${className}`}
       aria-live="polite"
     >

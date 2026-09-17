@@ -139,6 +139,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
           {/* Text Area */}
           <textarea
+            data-testid="chat-input"
             ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -168,6 +169,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {/* Detached Floating Action Button: Stop / Send / Go on */}
         {isStreaming ? (
           <button
+            data-testid="stop-stream-btn"
             type="button"
             onClick={onStopStreaming}
             className="w-[42px] h-[42px] sm:w-[46px] sm:h-[46px] rounded-xl sm:rounded-2xl bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-500/30 transition-all flex items-center justify-center flex-shrink-0 animate-pulse active:scale-95"
@@ -177,6 +179,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </button>
         ) : hasText ? (
           <button
+            data-testid="send-btn"
             type="button"
             onClick={handleSend}
             disabled={!isLmStudioConnected}
