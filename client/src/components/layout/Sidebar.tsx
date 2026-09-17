@@ -30,6 +30,45 @@ export const Sidebar: React.FC = () => {
   const sidebarOpen = useSelector((state: RootState) => state.ui.sidebarOpen);
   const zenMode = useSelector((state: RootState) => state.ui.zenMode);
 
+  // Desktop sidebar resizable width (clamped between 260px and 33.33vw)
+  const [sidebarWidth, setSidebarWidth] = React.useState<number>(() => {
+    if (typeof window === "undefined") return 260;
+    const saved = localStorage.getItem("aegis_sidebarWidth");
+    const parsed = saved ? parseInt(saved, 10) : 260;
+    const maxAllowed = Math.min(window.innerWidth / 3, window.innerWidth - 300);
+    return isNaN(parsed) ? 260 : Math.round(Math.max(260, Math.min(parsed, maxAllowed)));
+  });
+  const [isResizing, setIsResizing] = React.useState(false);
+
+  const startResizing = (e: React.PointerEvent) => {
+    if (window.innerWidth < 768) return;
+    e.preventDefault();
+    setIsResizing(true);
+    document.body.style.userSelect = "none";
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const maxAllowed = window.innerWidth / 3;
+      const newWidth = Math.round(Math.max(260, Math.min(moveEvent.clientX, maxAllowed)));
+      setSidebarWidth(newWidth);
+      localStorage.setItem("aegis_sidebarWidth", String(newWidth));
+    };
+
+    const onPointerUp = () => {
+      setIsResizing(false);
+      document.body.style.userSelect = "";
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  };
+
+  const handleDoubleClickReset = () => {
+    setSidebarWidth(260);
+    localStorage.setItem("aegis_sidebarWidth", "260");
+  };
+
   const { data: characters = [] } = useGetCharactersQuery();
   const { data: sessions = [] } = useGetSessionsQuery();
   const [resumeSession] = useResumeSessionMutation();
@@ -113,15 +152,25 @@ export const Sidebar: React.FC = () => {
         />
       )}
 
-      {/* Sidebar Panel with Smooth Desktop & Mobile Collapse */}
+      {/* Sidebar Panel: Pure fixed overlay on both desktop and mobile, never pushing app content */}
       <aside
-        className={`fixed md:relative inset-y-0 left-0 z-40 glass-panel border-r border-white/10 flex flex-col transition-all duration-300 ease-in-out bg-dark-950/95 flex-shrink-0 pt-[calc(4rem+max(env(safe-area-inset-top,0px),1.5rem))] md:pt-0 ${
+        style={{
+          width: sidebarOpen
+            ? typeof window !== "undefined" && window.innerWidth >= 768
+              ? `${sidebarWidth}px`
+              : "16rem"
+            : 0,
+          boxShadow: sidebarOpen ? "8px 0 32px rgba(0, 0, 0, 0.65)" : "none",
+        }}
+        className={`fixed inset-y-0 left-0 z-40 glass-panel border-r border-white/10 flex flex-col bg-dark-950/95 flex-shrink-0 pt-[calc(4rem+max(env(safe-area-inset-top,0px),1.5rem))] md:pt-0 ${
+          isResizing ? "transition-none select-none" : "transition-all duration-300 ease-in-out"
+        } ${
           sidebarOpen
-            ? "w-64 translate-x-0 opacity-100"
-            : "w-0 -translate-x-full md:w-0 md:translate-x-0 opacity-0 pointer-events-none md:border-r-0 overflow-hidden"
+            ? "translate-x-0 opacity-100"
+            : "-translate-x-full opacity-0 pointer-events-none border-r-0 overflow-hidden"
         }`}
       >
-        <div className="w-64 flex flex-col h-full">
+        <div className="flex flex-col h-full w-full overflow-hidden">
           {/* Brand Header: Shown on Desktop to align seamlessly with Navbar seam */}
           <div className="hidden md:flex h-16 px-4 border-b border-white/10 items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">
@@ -290,6 +339,22 @@ export const Sidebar: React.FC = () => {
             <Settings className="w-4 h-4" /> App & Database Settings
           </Link>
         </div>
+        </div>
+
+        {/* Desktop Resize Handle on Right Edge (hidden on mobile) */}
+        <div
+          onPointerDown={startResizing}
+          onDoubleClick={handleDoubleClickReset}
+          className="hidden md:flex absolute top-0 right-0 w-2.5 h-full cursor-col-resize z-50 items-center justify-center group/handle select-none touch-none"
+          title="Drag to resize · Double-click to reset (260px)"
+        >
+          <div
+            className={`w-0.5 h-full transition-colors ${
+              isResizing
+                ? "bg-brand-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]"
+                : "bg-transparent group-hover/handle:bg-brand-500/60"
+            }`}
+          />
         </div>
       </aside>
     </>
