@@ -1,6 +1,7 @@
 import React from "react";
 import { Character } from "../../api/baseApi.js";
 import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
+import { ThinkingIndicator } from "./ThinkingIndicator.js";
 import { Bot, Sparkles } from "lucide-react";
 
 interface StreamingMessageProps {
@@ -46,12 +47,7 @@ export const StreamingMessage: React.FC<StreamingMessageProps> = React.memo(
                 <MarkdownRenderer content={streamingText} />
               </div>
             ) : (
-              <div className="flex items-center gap-1 py-1 text-slate-400 text-xs">
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce" />
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce [animation-delay:0.2s]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce [animation-delay:0.4s]" />
-                <span className="ml-1.5 font-mono text-[10px] text-brand-300">Formulating response...</span>
-              </div>
+              <ThinkingIndicator />
             )}
           </div>
         </div>
