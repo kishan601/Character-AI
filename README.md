@@ -732,6 +732,27 @@ This is an important design property:
 
 ---
 
+# 🧪 End-to-End Testing (Cypress)
+
+Aegis AI includes a full suite of automated Cypress E2E tests covering desktop and mobile workflows:
+
+```bash
+# Run headless Cypress E2E test suite
+npm --prefix client run test:e2e
+
+# Open interactive Cypress test runner
+npm --prefix client run cypress:open
+```
+
+### Test Coverage Highlights:
+- **Navigation & Discovery**: Character grid cards, instant debounced search filter, category tags.
+- **Chat & Streaming**: SSE response ingestion, real-time `ThinkingIndicator` transitions, abort generation.
+- **Sidebar & Sessions**: Desktop resize handle, overlay collapse animations, multi-session persistence.
+- **Character Creator**: Multi-step creation form, avatar crop modals, dynamic macro interpolation.
+- **Mobile Viewports**: Capacitor WebView simulation (375x812), pull-to-refresh elastic drag, safe-area insets.
+
+---
+
 # 🤝 Contributing
 
 Pull requests are welcome.
