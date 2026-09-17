@@ -25,7 +25,8 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({ character }) => {
   return (
     <div
       onClick={handleStartChat}
-      className="group relative rounded-3xl overflow-hidden glass-panel border border-white/10 hover:border-brand-500/40 transition-all duration-300 hover:shadow-2xl hover:shadow-brand-950/40 flex flex-col h-full cursor-pointer"
+      style={{ contentVisibility: "auto", containIntrinsicSize: "0 340px" }}
+      className="group relative rounded-3xl overflow-hidden bg-dark-900/85 hover:bg-dark-900/95 border border-white/10 hover:border-brand-500/40 transition-all duration-300 hover:shadow-2xl hover:shadow-brand-950/40 flex flex-col h-full cursor-pointer"
     >
       {/* Background Wallpaper Banner */}
       <div className="h-28 w-full relative overflow-hidden bg-gradient-to-br from-dark-900 via-dark-800 to-brand-950">

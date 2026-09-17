@@ -58,26 +58,22 @@ export const MessageList: React.FC<MessageListProps> = ({
     ? {
         backgroundColor: "transparent",
         borderColor: "transparent",
-        backdropFilter: "none",
         boxShadow: "none",
       }
     : {
-        backgroundColor: `rgba(45, 16, 82, ${(bubbleOpacity / 100) * 0.75})`,
-        borderColor: `rgba(168, 85, 247, ${(bubbleOpacity / 100) * 0.35})`,
-        backdropFilter: bubbleOpacity > 15 ? "blur(10px)" : "none",
+        backgroundColor: `rgba(45, 16, 82, ${(bubbleOpacity / 100) * 0.85})`,
+        borderColor: `rgba(168, 85, 247, ${(bubbleOpacity / 100) * 0.4})`,
       };
 
   const assistantBubbleStyle: React.CSSProperties = bubbleOpacity === 0
     ? {
         backgroundColor: "transparent",
         borderColor: "transparent",
-        backdropFilter: "none",
         boxShadow: "none",
       }
     : {
-        backgroundColor: `rgba(15, 17, 23, ${(bubbleOpacity / 100) * 0.65})`,
-        borderColor: `rgba(255, 255, 255, ${(bubbleOpacity / 100) * 0.08})`,
-        backdropFilter: bubbleOpacity > 15 ? "blur(10px)" : "none",
+        backgroundColor: `rgba(15, 17, 23, ${(bubbleOpacity / 100) * 0.85})`,
+        borderColor: `rgba(255, 255, 255, ${(bubbleOpacity / 100) * 0.1})`,
       };
 
   const textContrastClass = bubbleOpacity < 35 ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]" : "";
