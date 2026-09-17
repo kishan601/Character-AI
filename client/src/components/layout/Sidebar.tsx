@@ -154,6 +154,7 @@ export const Sidebar: React.FC = () => {
 
       {/* Sidebar Panel: Pure fixed overlay on both desktop and mobile, never pushing app content */}
       <aside
+        data-testid="sidebar-container"
         style={{
           width: sidebarOpen
             ? typeof window !== "undefined" && window.innerWidth >= 768
@@ -175,6 +176,7 @@ export const Sidebar: React.FC = () => {
           <div className="hidden md:flex h-16 px-4 border-b border-white/10 items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">
               <button
+                data-testid="sidebar-toggle-btn"
                 type="button"
                 onClick={() => dispatch(toggleSidebar())}
                 className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
@@ -235,6 +237,7 @@ export const Sidebar: React.FC = () => {
                   const isActive = location.pathname === `/chat/${sess.id}`;
                   return (
                     <div
+                      data-testid="session-row"
                       key={sess.id}
                       onClick={() => {
                         dispatch(setSidebarOpen(false));
@@ -266,6 +269,7 @@ export const Sidebar: React.FC = () => {
                         </div>
                       </div>
                       <button
+                        data-testid="delete-session-btn"
                         type="button"
                         onClick={(e) => handleDeleteCharacterRecent(e, sess)}
                         className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-slate-500 transition-opacity flex-shrink-0"
