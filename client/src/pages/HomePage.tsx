@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Search, PlusCircle, Sparkles, Bot, ShieldCheck, RotateCw } from "lucide-react";
 import { useGetCharactersQuery, useGetSessionsQuery } from "../api/baseApi.js";
@@ -15,6 +15,9 @@ export const HomePage: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const touchStartRef = useRef<{ y: number; x: number }>({ y: 0, x: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  // rAF throttle: batch touchmove → one setState per frame
+  const rafRef = useRef<number | null>(null);
+  const pendingPullY = useRef<number>(0);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (containerRef.current && containerRef.current.scrollTop <= 0) {
@@ -35,15 +38,27 @@ export const HomePage: React.FC = () => {
 
       // Only engage if movement is predominantly vertical downward
       if (deltaY > 0 && deltaY > deltaX) {
-        const damped = Math.min(deltaY * 0.42, 75);
-        setPullY(damped);
+        pendingPullY.current = Math.min(deltaY * 0.42, 75);
       } else {
-        setPullY(0);
+        pendingPullY.current = 0;
+      }
+
+      // Throttle: commit state at most once per animation frame
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          setPullY(pendingPullY.current);
+          rafRef.current = null;
+        });
       }
     }
   };
 
   const handleTouchEnd = async () => {
+    // Cancel any pending rAF before committing final state
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     if (pullY >= 48 && !isRefreshing) {
       setIsRefreshing(true);
       setPullY(48);
@@ -59,6 +74,7 @@ export const HomePage: React.FC = () => {
       setPullY(0);
     }
     touchStartRef.current = { y: 0, x: 0 };
+    pendingPullY.current = 0;
   };
 
   const filtered = characters.filter(
