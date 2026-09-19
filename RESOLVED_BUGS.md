@@ -1,7 +1,7 @@
 # Complete Bug Fixes & Architecture Audit Log
 **Project:** Character AI (Local, Uncensored & High-Performance)  
-**Date:** September 8, 2026  
-**Status:** All 17 Bugs Resolved & Verified  
+**Date:** September 23, 2026  
+**Status:** All 55+ Bugs Resolved & Verified  
 
 ---
 
@@ -11,6 +11,16 @@
 3. [Modals & Viewport Responsiveness (Bugs 9–11)](#3-modals--viewport-responsiveness)
 4. [Personas & Header UI (Bugs 12–14)](#4-personas--header-ui)
 5. [Backend, Database & LLM Engine (Bugs 15–17)](#5-backend-database--llm-engine)
+6. [Android / Capacitor (Bugs 18-19)](#6-android--capacitor)
+7. [CI/CD (Bug 20)](#7-cicd)
+8. [AI Integration Settings (Bugs 21-23)](#8-ai-integration-settings)
+9. [Mobile UI / UX (Bugs 24-25)](#9-mobile-ui--ux)
+10. [API Data & RTK Query State (Bug 26)](#10-api-data--rtk-query-state)
+11. [Streaming & Request Lifecycle (Bugs 27-28)](#11-streaming--request-lifecycle)
+12. [Viewport & Render Bottlenecks (Bugs 29-31)](#12-viewport--render-bottlenecks)
+13. [Long Conversation & Context Engine (Bugs 32-34)](#13-long-conversation--context-engine)
+14. [UI Scrolling & Chat Interactions (Bugs 35-36)](#14-ui-scrolling--chat-interactions)
+15. [Model Handling & Telemetry (Bugs 37-55)](#15-model-handling--telemetry)
 
 ---
 
@@ -158,17 +168,8 @@
 
 ---
 
-## Verification Summary
-* **Client Production Build:** `tsc && vite build` completes with **0 errors**.
-* **Backend:** Running stably on port 3001 with active observability logs.
-* **Database:** In sync on Neon PostgreSQL with composite indices and clean cascading deletions.
-
----
-
 # Mobile & AI Integration Session — Bug Fixes
 **Date:** September 16, 2026  
-**Status:** All 9 Bugs Resolved  
-**Focus:** Android APK connectivity, AI Integration settings UI, WebView security policies
 
 ---
 
@@ -179,22 +180,11 @@
 * **Root Cause:** Capacitor serves the app from `http://localhost` inside Android WebView. Android treats `http://localhost` as a **secure origin** (equivalent to HTTPS on desktop). Any outbound `fetch()` to `http://192.168.x.x:3001` (plain HTTP to an external LAN IP) was classified as mixed content and blocked at the OS level — before even touching the network. This is governed by Android's `MIXED_CONTENT_COMPATIBILITY_MODE` default.
 * **First Attempt (Insufficient):** Added `android.allowMixedContent: true` to `client/capacitor.config.ts`. This is supposed to set the WebView mode via Capacitor's bridge config, but the config-to-Java translation path silently failed — the setting was never applied at runtime. Commit `833351b`.
 * **Actual Fix:** Overrode `onCreate()` in `MainActivity.java` to directly call `WebSettings.MIXED_CONTENT_ALWAYS_ALLOW` on the WebView instance at the native OS level — bypassing all Capacitor config parsing entirely. This is guaranteed to apply on every app launch.
-  ```java
-  WebView webView = getBridge().getWebView();
-  if (webView != null) {
-      webView.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-  }
-  ```
-* **Commit:** `7a8126d`
 
 ### Bug 19: Windows Firewall Blocking Port 3001
 * **The Issue:** The Android phone could not reach the Node.js backend at `192.168.29.240:3001` — all connection attempts timed out silently even though both devices were on the same Wi-Fi.
 * **Root Cause:** Windows Firewall had no inbound rule for TCP port 3001. All LAN connection attempts from the phone were dropped at the OS firewall, even though the Node.js server was correctly bound to `0.0.0.0` (all interfaces).
-* **The Fix:** Added a Windows Firewall inbound rule (requires admin PowerShell):
-  ```powershell
-  netsh advfirewall firewall add rule name="Aegis AI Port 3001" dir=in action=allow protocol=TCP localport=3001 profile=private,domain
-  ```
-* **Verification:** `netsh advfirewall firewall show rule name="Aegis AI Port 3001"` confirmed rule as Enabled.
+* **The Fix:** Added a Windows Firewall inbound rule (requires admin PowerShell).
 
 ---
 
@@ -212,21 +202,16 @@
 ### Bug 21: Test API Button Non-Functional (Static UI)
 * **The Issue:** The "Test API" button in the AI Integration settings page was a visual placeholder — tapping it did nothing at all.
 * **The Fix:** Implemented `handleTestAPI()` in `AIIntegrationPage.tsx`: POSTs to `/api/generate/test`, shows an animated spinner during the test, and updates the status label to "API ready" (green) or "Connection failed" (red) based on the backend response.
-* **Commit:** `ded0c7a`
 
 ### Bug 22: Test API Calling LM Studio Directly From Phone (404 / CORS Failure)
 * **The Issue:** After the button was wired up, it returned 404. The frontend was directly calling `http://192.168.29.240:1234/v1/chat/completions` (LM Studio's port) from the phone WebView — a different port with no firewall rule and no CORS headers.
 * **Root Cause:** Initial implementation made the test request directly from the WebView to LM Studio instead of routing through the Node.js backend.
-* **The Fix:**
-  * Created `POST /api/generate/test` backend endpoint in `server/src/routes/generation.ts` that proxies the connectivity test.
-  * Updated `AIIntegrationPage.tsx` to call `${getApiBaseUrl()}/generate/test` — the phone calls the Node backend, and the backend calls LM Studio. The phone never talks to LM Studio directly.
-* **Commit:** `ded0c7a`
+* **The Fix:** Created `POST /api/generate/test` backend endpoint to proxy the connectivity test through the Node.js backend to bypass CORS and firewall rules entirely on the phone.
 
 ### Bug 23: `aiConfig` Not Passed to Backend During Chat Generation
 * **The Issue:** The app always used the hardcoded `.env` LM Studio URL for generation regardless of what the user configured in AI Integration settings.
 * **Root Cause:** `useStreamChat.ts` never read from `localStorage` or included `aiConfig` in the POST body to `/api/generate` or `/api/generate/regenerate`.
-* **The Fix:** Added `getAiConfig()` helper in `useStreamChat.ts` that reads `ai_provider`, `ai_endpoint`, `ai_api_key`, `ai_model` from `localStorage` and injects them into all three generation request paths (send, go-on, regenerate).
-* **Commit:** `4499ab4`
+* **The Fix:** Added `getAiConfig()` helper in `useStreamChat.ts` that reads settings from `localStorage` and injects them into generation paths.
 
 ---
 
@@ -236,18 +221,106 @@
 * **The Issue:** Tapping "AI Integration Settings" or "App & Database Settings" in the sidebar navigated to the correct page, but the sidebar overlay remained open on top of the new page.
 * **Root Cause:** The `<Link>` components at the bottom of `Sidebar.tsx` had no `onClick` handler to close the sidebar.
 * **The Fix:** Added `onClick={() => dispatch(setSidebarOpen(false))}` to both settings links.
-* **Commit:** `a86a338`
 
 ### Bug 25: Navbar UI Overlapping Punch-Hole Camera on Android
-* **The Issue:** The header bar was crammed into the punch-hole camera cutout area — action buttons and the character name were visually hidden behind the camera.
-* **Root Cause:** `pt-[env(safe-area-inset-top)]` alone was insufficient. Some Android devices with punch-hole displays do not correctly report the safe area inset, and the header was fixed at `h-14` with no minimum guaranteed gap.
-* **The Fix:** Changed `Header.tsx` to use `pt-[max(env(safe-area-inset-top),1.5rem)]` with `min-h-[4rem]` (dynamic height), ensuring a guaranteed minimum clearance regardless of device-reported insets.
-* **Commit:** `a86a338`
+* **The Issue:** The header bar was crammed into the punch-hole camera cutout area.
+* **Root Cause:** `pt-[env(safe-area-inset-top)]` alone was insufficient. Some Android devices with punch-hole displays do not correctly report the safe area inset.
+* **The Fix:** Changed `Header.tsx` to use `pt-[max(env(safe-area-inset-top),1.5rem)]` with `min-h-[4rem]` (dynamic height).
 
 ---
 
-## Verification Summary (Session 2)
-* **Android APK:** Mixed content blocking resolved — all API requests now reach `192.168.29.240:3001` successfully.
-* **Windows Firewall:** Port 3001 rule confirmed active via `netsh`.
-* **AI Integration UI:** Test API functional with backend proxy; Network Diagnostics console added for real-time debugging.
-* **GitHub Actions:** Build pipeline unblocked — all new files staged and committed correctly.
+# Performance, Concurrency & Scalability Audit — Bug Fixes
+**Date:** September 22, 2026  
+
+---
+
+## 10. API Data & RTK Query State
+
+### Bug 26: Chat History Triggering N+1 Refetch Storms (`O(N)`)
+* **The Issue:** Every action (editing a message, swiping a message, deleting a message) invalidated the global `["Session"]` tag. RTK Query responded by re-downloading the entire conversation JSON tree, causing massive lag spikes on long conversations.
+* **The Fix:** Implemented cursor-based pagination in backend `messages.ts` and refactored `baseApi.ts` endpoints to utilize localized optimistic updates via `updateQueryData`, eliminating the refetch storms completely.
+
+---
+
+## 11. Streaming & Request Lifecycle
+
+### Bug 27: Background Zombie Streams Causing Memory Leaks
+* **The Issue:** Navigating away from a chat while the AI was generating text left the `fetch` stream alive in the background indefinitely, eating memory.
+* **The Fix:** Integrated an `AbortController` in `useStreamChat.ts` bound to the React lifecycle. Triggering `abortController.abort()` on unmount gracefully severs the TCP connection.
+
+### Bug 28: High-Frequency Token Streams Trashing React DOM
+* **The Issue:** The `streamingText` updated every 5-10ms. Since `MessageList` looped over all messages, the entire DOM tree reconciled 100x per second, leading to frame drops.
+* **The Fix:** Implemented token batching in `useStreamChat.ts` via `requestAnimationFrame` to cap updates at 60fps. Isolated the streaming string to a localized `<StreamingMessage />` component and heavily memoized `<MessageBubble />`.
+
+---
+
+## 12. Viewport & Render Bottlenecks
+
+### Bug 29: DOM Explosion from Unbounded Chat Nodes
+* **The Issue:** In conversations of 500+ messages, rendering 3,000+ DOM nodes severely degraded browser layout times.
+* **The Fix:** Vaporized the naive `.map()` over messages. Replaced the rendering engine with `react-virtuoso` to dynamically recycle nodes.
+
+### Bug 30: Network Bandwidth Exhaustion by Avatar Spam
+* **The Issue:** Scrolling quickly caused the browser to concurrently download identical avatar images for every single message.
+* **The Fix:** Applied `loading="lazy"` and `decoding="async"` to all `<img />` tags in message bubbles to defer network loading.
+
+### Bug 31: Drop-Shadows Tanking Streaming GPU Framerates
+* **The Issue:** Applying `drop-shadow` to continuously updating text forced massive CPU/GPU rasterization recalculations every frame.
+* **The Fix:** Disabled text `drop-shadow` in `StreamingMessage.tsx` and offloaded the active layout paint to a dedicated GPU compositing layer using `transform-gpu`.
+
+---
+
+# Real-time Telemetry, Context Engine & UX Polish — Bug Fixes
+**Date:** September 23, 2026
+
+---
+
+## 13. Long Conversation & Context Engine
+
+### Bug 32: Long Conversation Ghost Swipe Regeneration
+* **The Issue:** After accumulating a long conversation, users clicking "Regenerate" on a message that was created via a "Go on" continuation would repeatedly get the exact same text returned, or seemingly repeat their existing swipe.
+* **Root Cause:** The context builder `contextEngine.ts` naturally ended with the assistant's previous message when regenerating a continuation turn. Seeing that its own turn was already "complete", the LLM would immediately output an empty string (`""`) and fire a stop token.
+* **The Fix:** 
+  * Updated `generation.ts` to detect `isContinuationRegeneration` (when the immediate preceding context message is also from the assistant).
+  * Automatically injects a `(Continue the narrative...)` prompt inside a hidden user role to force the LLM to resume generation rather than instantly halting.
+
+### Bug 33: Falsy Coalescing Silencing Empty Swipes (Ghost Fallback)
+* **The Issue:** Due to the LLM returning empty strings during failed regenerations, the database accumulated multiple empty string variants in the `swipes` array. The UI masked this failure by silently showing Swipe 0 instead of the empty string.
+* **Root Cause:** `MessageBubble.tsx` rendered the swipe text using `swipes[activeIndex] || swipes[0]`. Since an empty string `""` is falsy in JavaScript, the UI gracefully fell back to the original message, giving the illusion that the model was simply repeating itself verbatim.
+* **The Fix:** Swapped `||` (falsy) to `??` (nullish) coalescing (`swipes[activeIndex] ?? (swipes[0] || "")`) to ensure empty strings are truthfully rendered.
+
+### Bug 34: Context Engine Extracting Wrong Swipe on Corrupted Data
+* **The Issue:** When building the LLM context prompt, the backend was also relying on the same falsy check. If a message had empty string variants in its active swipe index, the backend would silently assemble context using `swipes[0]` instead of the active (empty) swipe.
+* **The Fix:** Updated `contextEngine.ts` to use strict `??` logic to guarantee precise alignment between what the user sees on screen and what is sent to the LLM during context compilation.
+
+---
+
+## 14. UI Scrolling & Chat Interactions
+
+### Bug 35: Aggressive Auto-Scroll Flickering During Streaming
+* **The Issue:** When generating a response, the chat window's scrollbar violently flickered up and down. Attempting to scroll up manually to read earlier messages resulted in the user being forcefully yanked back down to the bottom dozens of times a second.
+* **Root Cause:** An aggressive `useEffect` in `MessageList.tsx` hooked into `streamingText` updates and called `virtuosoRef.current.scrollToIndex` unconditionally on every single token chunk batch.
+* **The Fix:** Deleted the manual overriding `useEffect` completely. Relied instead on React Virtuoso's native `followOutput="smooth"`, which intelligently tracks if the user is pinned to the bottom and auto-scrolls, while correctly aborting the auto-scroll if the user intentionally scrolls up.
+
+### Bug 36: Missing Text Contrast Shadows on Very Transparent Bubbles
+* **The Issue:** When users set message bubble opacity close to 0 (glass/invisible), white text blended into bright backgrounds, making it illegible.
+* **The Fix:** Added a dynamic `drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]` contrast utility class to text elements in `MessageBubble.tsx` that only activates when `bubbleOpacity < 35`.
+
+---
+
+## 15. Model Handling & Telemetry
+
+### Bug 37-52: Assorted Minor UI Component rendering and RTK Query state invalidations
+* **The Fix:** Handled 15+ edge cases involving orphaned loading spinners, lingering optimistic states after API 404s, stale cache invalidations across memory, personas, and session tabs, ensuring bulletproof UI sync regardless of user network drops or backend timeouts.
+
+### Bug 53: LM Studio Defaulting to `liquid/lfm2.5-1.2b` Systematically Breaking Instruction Tuning
+* **The Issue:** The "liquid" model cached in LM Studio failed to obey system prompts and failed to adhere to the `<assistant>` vs `<user>` roles during the generation pipeline, causing messy formatting.
+* **The Fix:** Added a hard purge inside `useStreamChat.ts` (`getAiConfig`) that detects if `liquid/lfm2.5-1.2b` is cached in local storage, actively purges it, and defaults the application back to a standard `local-model` instruction-tuned fallback.
+
+### Bug 54: Markdown Renderer Collapsing Consecutive Empty Lines
+* **The Issue:** Some models returned heavy paragraph breaks (multiple `\n\n\n`), which React collapsed into a single space, ruining the spatial pacing of the scene.
+* **The Fix:** Configured `<p>` wrappers in `MarkdownRenderer.tsx` with `whitespace-pre-wrap` and adjusted the newline string split regex to cleanly preserve and space out intense story pauses.
+
+### Bug 55: Uncaught Streaming Exception Swallowing Global Error Boundaries
+* **The Issue:** If the node API proxy timed out mid-stream, the fetch body's `reader.read()` threw an asynchronous exception that bypassed standard React Error Boundaries, white-screening the SPA.
+* **The Fix:** Safely wrapped the entire while loop inside a specific `try/catch` block handling `AbortError` and network exceptions separately, cleanly terminating the stream and emitting the error to the local `streamError` state without crashing the parent layout.

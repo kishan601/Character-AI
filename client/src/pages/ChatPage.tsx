@@ -11,6 +11,8 @@ import {
   useUpdateSessionMutation,
   useGetHealthQuery,
   useBatchDeleteMessagesMutation,
+  useGetMemoriesQuery,
+  useGetMessagesQuery,
 } from "../api/baseApi.js";
 import { useStreamChat } from "../hooks/useStreamChat.js";
 import { Header } from "../components/layout/Header.js";
@@ -96,17 +98,27 @@ export const ChatPage: React.FC = () => {
     }
   };
 
-  const messages = session?.messages || [];
+  const { data: messages = [], isFetching: isFetchingMessages } = useGetMessagesQuery(
+    { sessionId: sessionId || "" },
+    { skip: !sessionId }
+  );
   const character = session?.character;
   const userPersona = session?.userPersona;
-  const memories = session?.memories || [];
+
+  const { data: fetchedMemories } = useGetMemoriesQuery(
+    { characterId: character?.id || "", sessionId: session?.id },
+    { skip: !character?.id }
+  );
+  const memories = fetchedMemories || session?.memories || [];
 
   const handleEditMessage = async (messageId: string, newContent: string) => {
-    await editMessage({ id: messageId, content: newContent }).unwrap();
+    if (!sessionId) return;
+    await editMessage({ id: messageId, content: newContent, sessionId }).unwrap();
   };
 
   const handleSwitchSwipe = async (messageId: string, newIndex: number) => {
-    await switchSwipe({ id: messageId, swipeIndex: newIndex }).unwrap();
+    if (!sessionId) return;
+    await switchSwipe({ id: messageId, swipeIndex: newIndex, sessionId }).unwrap();
   };
 
   const handleRegenerateSwipe = async (messageId: string) => {
@@ -268,13 +280,26 @@ export const ChatPage: React.FC = () => {
     <div className="relative flex-1 flex flex-col h-full overflow-hidden bg-dark-950">
       {/* 1. Fullscreen Wallpaper Background (Fills entire screen on all devices) */}
       {character.backgroundUrl && (
-        <div
-          className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-all duration-700 pointer-events-none select-none"
-          style={{
-            backgroundImage: `url(${character.backgroundUrl})`,
-            filter: character.bgBlur ? `blur(${character.bgBlur}px)` : "none",
-          }}
-        />
+        <>
+          {/* Blurred backdrop to fill screen without black bars */}
+          <img
+            src={character.backgroundUrl}
+            alt=""
+            className="absolute inset-0 z-0 w-full h-full object-cover opacity-40 transition-all duration-700 pointer-events-none select-none"
+            style={{
+              filter: `blur(${Math.max(character.bgBlur || 0, 24)}px)`,
+            }}
+          />
+          {/* Unzoomed, contained original image/GIF */}
+          <img
+            src={character.backgroundUrl}
+            alt=""
+            className="absolute inset-0 z-0 w-full h-full object-contain transition-all duration-700 pointer-events-none select-none"
+            style={{
+              filter: character.bgBlur ? `blur(${character.bgBlur}px)` : "none",
+            }}
+          />
+        </>
       )}
 
       {/* Dimming Overlay */}
@@ -294,6 +319,7 @@ export const ChatPage: React.FC = () => {
 
       {/* 3. Header Bar with Seamless Soft Refresh and Character Drawer Trigger */}
       <Header
+        sessionId={session.id}
         character={character}
         userPersona={userPersona}
         memoriesCount={memories.length}

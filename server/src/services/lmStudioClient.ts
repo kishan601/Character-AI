@@ -63,7 +63,6 @@ export class LMStudioClient {
     presencePenalty?: number;
     frequencyPenalty?: number;
     seed?: number;
-    seed?: number;
     model?: string;
     aiConfig?: {
       aiEndpoint: string;
@@ -74,15 +73,17 @@ export class LMStudioClient {
   }): Promise<string> {
     const url = params.aiConfig?.aiEndpoint || `${this.baseUrl}/chat/completions`;
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (params.aiConfig?.aiApiKey) {
-      headers["Authorization"] = `Bearer ${params.aiConfig.aiApiKey}`;
+    
+    const apiKey = params.aiConfig?.aiApiKey || config.aiApiKey;
+    if (apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
     const res = await fetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        model: params.aiConfig?.aiModel || params.model || "local-model",
+        model: params.aiConfig?.aiModel || params.model || config.aiModel || "local-model",
         messages: params.messages,
         max_tokens: params.maxTokens || 400,
         max_completion_tokens: params.maxTokens || 400,
@@ -112,7 +113,6 @@ export class LMStudioClient {
     presencePenalty?: number;
     frequencyPenalty?: number;
     seed?: number;
-    seed?: number;
     model?: string;
     stop?: string[];
     signal?: AbortSignal;
@@ -126,15 +126,17 @@ export class LMStudioClient {
   }): Promise<string> {
     const url = params.aiConfig?.aiEndpoint || `${this.baseUrl}/chat/completions`;
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (params.aiConfig?.aiApiKey) {
-      headers["Authorization"] = `Bearer ${params.aiConfig.aiApiKey}`;
+    
+    const apiKey = params.aiConfig?.aiApiKey || config.aiApiKey;
+    if (apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
     const res = await fetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        model: params.aiConfig?.aiModel || params.model || "local-model",
+        model: params.aiConfig?.aiModel || params.model || config.aiModel || "local-model",
         messages: params.messages,
         max_tokens: params.maxTokens || 400,
         max_completion_tokens: params.maxTokens || 400,

@@ -26,18 +26,27 @@ export function serializeSwipes(swipes: string[]): any {
   return JSON.stringify(swipes);
 }
 
-// GET messages for session
+// GET messages for session (Paginated)
 messagesRouter.get("/session/:sessionId", async (req, res, next) => {
   try {
+    const limit = parseInt(req.query.limit as string) || 40;
+    const beforeCursor = req.query.beforeCursor as string;
+
     const messages = await prisma.message.findMany({
+      take: limit,
+      skip: beforeCursor ? 1 : 0,
+      cursor: beforeCursor ? { id: beforeCursor } : undefined,
       where: {
         sessionId: req.params.sessionId,
         isDeleted: false,
       },
-      orderBy: { orderIndex: "asc" },
+      orderBy: { orderIndex: "desc" },
     });
 
-    const normalized = messages.map((m) => ({
+    // Reverse to chronological order (oldest -> newest) for the frontend
+    const chronologicalMessages = messages.reverse();
+
+    const normalized = chronologicalMessages.map((m) => ({
       ...m,
       swipes: parseSwipes(m.swipes),
     }));

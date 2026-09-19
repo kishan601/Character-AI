@@ -16,6 +16,8 @@ export function calculateSlidingBudget(params: {
   systemOverhead: number;
 }): number {
   const { modelContextLimit, reserveTokens, systemOverhead } = params;
-  const available = modelContextLimit - reserveTokens - systemOverhead;
+  // Add a 10% safety buffer for tokenizer discrepancies between models (e.g. GPT vs Llama)
+  const safetyBuffer = Math.floor(modelContextLimit * 0.1);
+  const available = modelContextLimit - reserveTokens - systemOverhead - safetyBuffer;
   return Math.max(available, 500); // Guarantee minimum 500 tokens for immediate context
 }

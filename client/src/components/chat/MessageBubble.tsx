@@ -55,7 +55,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   // Optimistic swipe index for 0ms instant switching between already generated responses
   const [localIndex, setLocalIndex] = useState<number | null>(null);
   const activeIndex = localIndex !== null ? localIndex : (message.activeSwipeIndex ?? 0);
-  const currentText = swipes[activeIndex] || swipes[0] || "";
+  const currentText = swipes[activeIndex] ?? (swipes[0] || "");
 
   useEffect(() => {
     setLocalIndex(null);
@@ -443,6 +443,8 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
           <img
             src={avatarUrl}
             alt={senderName}
+            loading="lazy"
+            decoding="async"
             className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-white/10 shadow-sm ring-1 ring-black/30"
           />
         ) : (

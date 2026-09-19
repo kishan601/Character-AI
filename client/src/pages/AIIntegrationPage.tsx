@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ChevronRight, Sparkles, Globe, Key, Check } from "lucide-react";
-import { getApiBaseUrl } from "../config.js";
+import { ArrowLeft, ChevronRight, Sparkles, Globe, Key, Check, Server } from "lucide-react";
 
 // Hook to manage local storage state easily
 function useLocalState(key: string, defaultValue: string) {
@@ -21,10 +20,11 @@ export const AIIntegrationPage: React.FC = () => {
   const [provider, setProvider] = useLocalState("ai_provider", "Custom");
   const [endpoint, setEndpoint] = useLocalState("ai_endpoint", "http://192.168.29.240:1234/v1/chat/completions");
   const [apiKey, setApiKey] = useLocalState("ai_api_key", "");
-  const [model, setModel] = useLocalState("ai_model", "liquid/lfm2.5-1.2b");
+  const [model, setModel] = useLocalState("ai_model", "local-model");
+  const [contextLimit, setContextLimit] = useLocalState("ai_context_limit", "8192");
 
   // Modal states
-  const [activeModal, setActiveModal] = useState<"provider" | "endpoint" | "apiKey" | "model" | null>(null);
+  const [activeModal, setActiveModal] = useState<"provider" | "endpoint" | "apiKey" | "model" | "contextLimit" | null>(null);
 
   // Temporary edit states for modals
   const [editValue, setEditValue] = useState("");
@@ -45,7 +45,7 @@ export const AIIntegrationPage: React.FC = () => {
     if (isDebugging) return;
     setIsDebugging(true);
     setDebugLog([]);
-    const base = getApiBaseUrl();
+    const base = "/api";
 
     // 1. Test backend health
     try {
@@ -95,6 +95,7 @@ export const AIIntegrationPage: React.FC = () => {
     if (activeModal === "endpoint") setEndpoint(editValue);
     if (activeModal === "apiKey") setApiKey(editValue);
     if (activeModal === "model") setModel(editValue);
+    if (activeModal === "contextLimit") setContextLimit(editValue);
     setActiveModal(null);
     setTestStatus("idle"); // Reset status when settings change
   };
@@ -105,7 +106,7 @@ export const AIIntegrationPage: React.FC = () => {
     setTestStatus("idle");
     
     try {
-      const res = await fetch(`${getApiBaseUrl()}/generate/test`, {
+      const res = await fetch(`/api/generate/test`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -217,6 +218,22 @@ export const AIIntegrationPage: React.FC = () => {
               <div className="flex flex-col min-w-0">
                 <span className="text-[16px] font-medium text-[#f4f3f0] mb-[3px]">Model</span>
                 <span className="text-[14px] text-[#8e9699] truncate">{model}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Context Limit */}
+          <div 
+            onClick={() => openModal("contextLimit", contextLimit)}
+            className="flex items-center p-[18px] cursor-pointer hover:bg-white/5 transition-colors active:bg-white/10"
+          >
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-[46px] h-[46px] flex-shrink-0 rounded-[18px] bg-[#c58245] flex items-center justify-center text-[#2a1708]">
+                <Server className="w-[24px] h-[24px] fill-current opacity-80" strokeWidth={2} />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[16px] font-medium text-[#f4f3f0] mb-[3px]">Context Limit</span>
+                <span className="text-[14px] text-[#8e9699] truncate">{contextLimit} tokens</span>
               </div>
             </div>
           </div>

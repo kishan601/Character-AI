@@ -18,6 +18,8 @@ import {
   Trash2,
   Sliders,
   X,
+  Database,
+  Check,
 } from "lucide-react";
 import { RootState } from "../../store/store.js";
 import {
@@ -32,9 +34,12 @@ import {
   useUpdateCharacterMutation,
   Character,
   UserPersona,
+  useGetMemoryStatusQuery,
+  useCompactMemoryMutation,
 } from "../../api/baseApi.js";
 
 interface HeaderProps {
+  sessionId?: string;
   character?: Character | null;
   userPersona?: UserPersona | null;
   memoriesCount?: number;
@@ -47,6 +52,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
+  sessionId,
   character,
   userPersona,
   memoriesCount = 0,
@@ -101,12 +107,30 @@ export const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [refetchHealth]);
 
-  // Query personas if userPersona is not explicitly provided
   const { data: personas = [] } = useGetPersonasQuery(undefined, {
     skip: Boolean(userPersona),
   });
   const defaultPersona = personas.find((p) => p.isDefault) || personas[0];
   const activePersona = userPersona || defaultPersona;
+
+  const { data: memoryStatus, refetch: refetchMemoryStatus } = useGetMemoryStatusQuery(sessionId || "", {
+    skip: !sessionId,
+    pollingInterval: isAppVisible ? 10000 : 0
+  });
+  const [compactMemory, { isLoading: isCompacting }] = useCompactMemoryMutation();
+  const [justCompacted, setJustCompacted] = useState(false);
+
+  const handleManualCompact = async () => {
+    if (!sessionId || isCompacting || memoryStatus?.compactionStatus === 'compacting') return;
+    try {
+      await compactMemory(sessionId).unwrap();
+      refetchMemoryStatus();
+      setJustCompacted(true);
+      setTimeout(() => setJustCompacted(false), 3000);
+    } catch (e) {
+      console.error("Failed to compact memory:", e);
+    }
+  };
 
   const [isPersonaModalOpen, setIsPersonaModalOpen] = useState(false);
   const [editingPersona, setEditingPersona] = useState(character?.persona || "");
@@ -254,6 +278,42 @@ export const Header: React.FC<HeaderProps> = ({
               title="Zen Wallpaper Mode"
             >
               {zenMode ? <Eye className="w-4 h-4 text-brand-400" /> : <EyeOff className="w-4 h-4" />}
+            </button>
+          )}
+
+          {/* 2.5 Token Budget Visualizer & Manual Compact */}
+          {showChatControls && memoryStatus && (
+            <button
+              type="button"
+              onClick={handleManualCompact}
+              disabled={isCompacting || memoryStatus.compactionStatus === 'compacting' || memoryStatus.unsummarizedMessageCount <= 1}
+              className={`group flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all border text-xs font-medium relative overflow-hidden ${
+                memoryStatus.compactionStatus === 'compacting' || isCompacting
+                  ? "bg-brand-600/30 text-white border-brand-500/50"
+                  : memoryStatus.unsummarizedMessageCount > 1
+                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30"
+                  : "opacity-50 cursor-not-allowed bg-dark-900 border-white/5 text-slate-500"
+              }`}
+              title={memoryStatus.unsummarizedMessageCount <= 1 ? "Not enough messages to compact" : `Memory Pressure: ${Math.round(memoryStatus.memoryPressure * 100)}% - Click to manually compact`}
+            >
+              {/* Filling animation background */}
+              <div 
+                className="absolute left-0 bottom-0 top-0 bg-brand-500/20 -z-10 transition-all duration-1000 ease-in-out"
+                style={{ width: `${Math.min(100, memoryStatus.memoryPressure * 100)}%` }}
+              />
+              {justCompacted ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden lg:inline text-xs z-10 text-emerald-400">Compacted!</span>
+                </>
+              ) : (
+                <>
+                  <Database className={`w-3.5 h-3.5 ${isCompacting || memoryStatus.compactionStatus === 'compacting' ? 'animate-bounce text-brand-400' : memoryStatus.memoryPressure > 0.8 ? 'text-amber-400' : 'text-slate-400'}`} />
+                  <span className="hidden lg:inline text-xs z-10">
+                    {isCompacting || memoryStatus.compactionStatus === 'compacting' ? "Compacting..." : "Compact"}
+                  </span>
+                </>
+              )}
             </button>
           )}
 
@@ -420,6 +480,40 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold border border-amber-500/30">
                     {memoriesCount}
                   </span>
+                )}
+              </button>
+            )}
+
+            {/* 3.5 Token Budget Visualizer (Mobile) */}
+            {showChatControls && memoryStatus && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleManualCompact();
+                  setIsMenuOpen(false);
+                }}
+                disabled={isCompacting || memoryStatus.compactionStatus === 'compacting' || memoryStatus.unsummarizedMessageCount <= 1}
+                className="relative overflow-hidden flex items-center justify-between w-full px-3 py-2 rounded-xl hover:bg-white/10 text-slate-200 text-xs font-medium transition-colors text-left disabled:opacity-50"
+              >
+                <div 
+                  className="absolute left-0 bottom-0 top-0 bg-brand-500/20 -z-10 transition-all duration-1000 ease-in-out"
+                  style={{ width: `${Math.min(100, memoryStatus.memoryPressure * 100)}%` }}
+                />
+                <div className="flex items-center gap-2.5 z-10">
+                  {justCompacted ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      <span className="text-emerald-400">Successfully Compacted!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Database className={`w-4 h-4 ${isCompacting || memoryStatus.compactionStatus === 'compacting' ? 'text-brand-400 animate-pulse' : 'text-slate-400'}`} />
+                      <span>{isCompacting || memoryStatus.compactionStatus === 'compacting' ? "Compacting History..." : "Manual Compact History"}</span>
+                    </>
+                  )}
+                </div>
+                {!justCompacted && (
+                  <span className="text-[10px] font-mono text-slate-400 z-10">{Math.round(memoryStatus.memoryPressure * 100)}%</span>
                 )}
               </button>
             )}

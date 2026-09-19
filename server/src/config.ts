@@ -14,4 +14,6 @@ export const config = {
   defaultContextLimit: 8192,
   summaryThreshold: 10,
   summaryBatchSize: 8,
+  aiApiKey: process.env.AI_API_KEY || "",
+  aiModel: process.env.AI_MODEL || "local-model",
 };

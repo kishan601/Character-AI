@@ -7,88 +7,76 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// ─── AI Character Definition ────────────────────────────────────
-
 model Character {
-  id                 String         @id @default(cuid())
-  name               String
-  tagline            String?        // Short subtitle shown on card
-  description        String?        @db.Text   // Layer 1: Canonical Character Definition (Who the character is)
-  persona            String?        @db.Text   // Layer 2: Dynamic Character Persona (How the character behaves/speaks right now)
-  gender             String?                   // e.g. "female", "male", "non-binary", "custom"
-  pronounSubject     String?                   // e.g. "she", "he", "they"
-  pronounObject      String?                   // e.g. "her", "him", "them"
-  pronounPossessive  String?                   // e.g. "hers", "his", "theirs"
-  pronounDeterminer  String?                   // e.g. "her", "his", "their"
-  greeting           String         @db.Text   // First message when starting a new chat
-  systemPrompt       String         @db.Text   // Core personality + world lore instructions
-  exampleDialogue    String?        @db.Text   // Few-shot example messages (optional)
-  avatarUrl          String?                   // Relative path: /uploads/avatars/...
-  backgroundUrl      String?                   // Relative path: /uploads/wallpapers/...
-  bgBlur             Int            @default(0)    // Wallpaper blur 0-20px
-  bgDim              Int            @default(40)   // Wallpaper dimming 0-80%
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-  sessions           ChatSession[]
-  memories           PinnedMemory[]
+  id              String         @id @default(cuid())
+  name            String
+  tagline         String?
+  description     String?        @db.Text
+  persona         String?        @db.Text
+  gender          String?
+  pronounSubject  String?
+  pronounObject   String?
+  pronounPossessive String?
+  pronounDeterminer String?
+  greeting        String         @db.Text
+  systemPrompt    String         @db.Text
+  exampleDialogue String?        @db.Text
+  avatarUrl       String?
+  backgroundUrl   String?
+  bgBlur          Int            @default(0)
+  bgDim           Int            @default(40)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  sessions        ChatSession[]
+  memories        PinnedMemory[]
 }
-
-// ─── User Persona ("Who am I in this chat?") ────────────────────
 
 model UserPersona {
-  id                 String        @id @default(cuid())
-  name               String                       // Display name the character calls you
-  description        String        @db.Text       // Layer 3: Backstory, appearance, traits
-  gender             String?                      // e.g. "female", "male", "non-binary", "custom"
-  pronounSubject     String?                      // e.g. "he", "she", "they"
-  pronounObject      String?                      // e.g. "him", "her", "them"
-  pronounPossessive  String?                      // e.g. "his", "hers", "theirs"
-  pronounDeterminer  String?                      // e.g. "his", "her", "their"
-  avatarUrl          String?                      // Your avatar image
-  isDefault          Boolean       @default(false) // Auto-select for new sessions
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  sessions           ChatSession[]
+  id                String        @id @default(cuid())
+  name              String
+  description       String        @db.Text
+  avatarUrl         String?
+  isDefault         Boolean       @default(false)
+  gender            String?
+  pronounSubject    String?
+  pronounObject     String?
+  pronounPossessive String?
+  pronounDeterminer String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  sessions          ChatSession[]
 }
-
-// ─── Chat Session (1 Character + 1 Persona = 1 Conversation) ───
 
 model ChatSession {
   id                  String         @id @default(cuid())
-  title               String?        // Auto-generated or user-set session title
+  title               String?
   characterId         String
   character           Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
   userPersonaId       String?
   userPersona         UserPersona?   @relation(fields: [userPersonaId], references: [id], onDelete: SetNull)
-  rollingSummary      String?        @db.Text   // Accumulated conversation summary
-  summarizedUpToIndex Int            @default(0) // Track which messages have been summarized
-  preferredMaxTokens  Int            @default(400) // Per-session token slider value
+  rollingSummary      String?        @db.Text
+  summarizedUpToIndex Int            @default(0)
+  preferredMaxTokens  Int            @default(400)
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   messages            Message[]
   memories            PinnedMemory[]
-
-  @@index([characterId, updatedAt(sort: Desc)])
 }
-
-// ─── Message (Supports Multi-Swipe Variants) ────────────────────
 
 model Message {
   id               String       @id @default(cuid())
   sessionId        String
   session          ChatSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  orderIndex       Int          // Explicit ordering (0, 1, 2, ...) for reliable sequencing
+  orderIndex       Int
   sender           String       // "user" | "assistant"
-  swipes           String[]     // Array of text variants (multi-swipe)
-  activeSwipeIndex Int          @default(0)  // Which swipe is currently "active"
-  isDeleted        Boolean      @default(false) // Soft-delete for edit branching
+  swipes           String[]     @default([])
+  activeSwipeIndex Int          @default(0)
+  isDeleted        Boolean      @default(false)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
   @@index([sessionId, orderIndex])
 }
-
-// ─── Pinned Memory (User-Curated Persistent Facts) ──────────────
 
 model PinnedMemory {
   id          String       @id @default(cuid())
@@ -96,7 +84,7 @@ model PinnedMemory {
   character   Character    @relation(fields: [characterId], references: [id], onDelete: Cascade)
   sessionId   String?
   session     ChatSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  content     String       @db.Text  // The pinned fact/lore/memory
-  label       String?      // Optional short label (e.g. "First Meeting", "Allergy")
+  content     String       @db.Text
+  label       String?
   createdAt   DateTime     @default(now())
 }
