@@ -10,6 +10,8 @@ interface ChatInputProps {
   isLmStudioConnected: boolean;
   characterName: string;
   onSavePreference?: (tokens: number) => void;
+  onPrevSwipe?: () => void;
+  onNextSwipe?: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -20,6 +22,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isLmStudioConnected,
   characterName,
   onSavePreference,
+  onPrevSwipe,
+  onNextSwipe,
 }) => {
   const [text, setText] = useState("");
   const [showSlider, setShowSlider] = useState(false);
@@ -58,6 +62,22 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Keyboard swipe navigation: Alt+Arrow or Arrow when textarea is empty
+    if ((e.key === "ArrowLeft" && (e.altKey || !text)) || (e.key === "<" && e.altKey)) {
+      if (onPrevSwipe) {
+        e.preventDefault();
+        onPrevSwipe();
+        return;
+      }
+    }
+    if ((e.key === "ArrowRight" && (e.altKey || !text)) || (e.key === ">" && e.altKey)) {
+      if (onNextSwipe) {
+        e.preventDefault();
+        onNextSwipe();
+        return;
+      }
+    }
+
     // On phone / touch screen: let Enter / Return key insert a newline naturally
     if (isTouchDevice()) {
       return;

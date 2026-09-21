@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../store/store.js";
@@ -151,6 +151,63 @@ export const ChatPage: React.FC = () => {
   const handleRegenerateSwipe = async (messageId: string) => {
     await regenerateMessage(messageId, currentMaxTokens);
   };
+
+  // Latest assistant message for desktop keyboard swipe navigation (< > / ArrowLeft ArrowRight)
+  const latestAssistantMessage = useMemo(() => {
+    return [...messages].reverse().find((m) => m.sender === "assistant");
+  }, [messages]);
+
+  const handlePrevSwipe = useCallback(() => {
+    if (!latestAssistantMessage || isStreaming) return;
+    const currentIdx = latestAssistantMessage.activeSwipeIndex ?? 0;
+    if (currentIdx > 0) {
+      handleSwitchSwipe(latestAssistantMessage.id, currentIdx - 1);
+    }
+  }, [latestAssistantMessage, isStreaming]);
+
+  const handleNextSwipe = useCallback(() => {
+    if (!latestAssistantMessage || isStreaming) return;
+    const currentIdx = latestAssistantMessage.activeSwipeIndex ?? 0;
+    const totalSwipes = latestAssistantMessage.swipes?.length ?? 1;
+    if (currentIdx < totalSwipes - 1) {
+      handleSwitchSwipe(latestAssistantMessage.id, currentIdx + 1);
+    } else {
+      handleRegenerateSwipe(latestAssistantMessage.id);
+    }
+  }, [latestAssistantMessage, isStreaming]);
+
+  // Global keyboard listener for < > and ArrowLeft / ArrowRight desktop navigation
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (isDeleteMode || isProfileDrawerOpen) return;
+
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      const isInput = activeTag === "input" || activeTag === "textarea";
+
+      // If user is actively typing text inside input/textarea, require Alt key
+      if (isInput) {
+        const target = document.activeElement as HTMLInputElement | HTMLTextAreaElement;
+        if (target.value?.trim() && !e.altKey) {
+          return;
+        }
+      }
+
+      if (e.key === "ArrowLeft" || e.key === "<" || (e.altKey && e.key === ",")) {
+        if (!e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          handlePrevSwipe();
+        }
+      } else if (e.key === "ArrowRight" || e.key === ">" || (e.altKey && e.key === ".")) {
+        if (!e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          handleNextSwipe();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [handlePrevSwipe, handleNextSwipe, isDeleteMode, isProfileDrawerOpen]);
 
   const handlePinMemory = async (content: string, label?: string) => {
     await pinMemory({
@@ -321,6 +378,8 @@ export const ChatPage: React.FC = () => {
               isLmStudioConnected={isLmConnected}
               characterName={character.name}
               onSavePreference={handleSaveTokenPreference}
+              onPrevSwipe={handlePrevSwipe}
+              onNextSwipe={handleNextSwipe}
             />
           )}
         </div>
