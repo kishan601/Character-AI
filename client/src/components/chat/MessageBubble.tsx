@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useSelector } from "react-redux";
 import {
   Edit3,
@@ -8,6 +8,9 @@ import {
   Copy,
   Bot,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
 } from "lucide-react";
 import { Message, Character, UserPersona } from "../../api/baseApi.js";
 import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
@@ -87,6 +90,189 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
     setTimeout(() => setPinned(false), 2500);
   };
 
+  // Swipe gesture state & physics
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isHorizontalSwipeRef = useRef<boolean | null>(null);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const canSwipeLeft = !isStreaming && !isEditing && !isDeleteMode && (activeIndex < swipes.length - 1 || isLastAssistant);
+  const canSwipeRight = !isStreaming && !isEditing && !isDeleteMode && activeIndex > 0;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!isAssistant || isEditing || isStreaming || isRegeneratingThis || isDeleteMode) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("button, a, input, textarea, pre, code, [role='button']")) return;
+
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    isHorizontalSwipeRef.current = null;
+    setIsDragging(false);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+
+    if (isHorizontalSwipeRef.current === null) {
+      if (Math.abs(deltaX) > 7 || Math.abs(deltaY) > 7) {
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          isHorizontalSwipeRef.current = true;
+          setIsDragging(true);
+        } else {
+          isHorizontalSwipeRef.current = false;
+        }
+      }
+    }
+
+    if (isHorizontalSwipeRef.current) {
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+      let effective = deltaX;
+      if (deltaX > 0 && !canSwipeRight) {
+        effective = deltaX * 0.25;
+      } else if (deltaX < 0 && !canSwipeLeft) {
+        effective = deltaX * 0.25;
+      } else {
+        effective = deltaX * 0.85;
+      }
+      setDragOffset(Math.max(-130, Math.min(130, effective)));
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (!touchStartRef.current || !isHorizontalSwipeRef.current) {
+      touchStartRef.current = null;
+      isHorizontalSwipeRef.current = null;
+      setDragOffset(0);
+      setIsDragging(false);
+      return;
+    }
+
+    const currentOffset = dragOffset;
+    touchStartRef.current = null;
+    isHorizontalSwipeRef.current = null;
+    setIsDragging(false);
+
+    const SWIPE_THRESHOLD = 45;
+
+    if (currentOffset < -SWIPE_THRESHOLD && canSwipeLeft) {
+      setIsAnimating(true);
+      setDragOffset(-160);
+      setTimeout(async () => {
+        setDragOffset(80);
+        if (activeIndex < swipes.length - 1) {
+          await handleSwitchSwipe(activeIndex + 1);
+        } else if (isLastAssistant) {
+          await onRegenerateSwipe(message.id);
+        }
+        requestAnimationFrame(() => {
+          setIsAnimating(false);
+          setDragOffset(0);
+        });
+      }, 160);
+    } else if (currentOffset > SWIPE_THRESHOLD && canSwipeRight) {
+      setIsAnimating(true);
+      setDragOffset(160);
+      setTimeout(async () => {
+        setDragOffset(-80);
+        await handleSwitchSwipe(activeIndex - 1);
+        requestAnimationFrame(() => {
+          setIsAnimating(false);
+          setDragOffset(0);
+        });
+      }, 160);
+    } else {
+      setDragOffset(0);
+    }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (!isAssistant || isEditing || isStreaming || isRegeneratingThis || isDeleteMode) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("button, a, input, textarea, pre, code, [role='button']")) return;
+
+    pointerStartRef.current = { x: e.clientX, y: e.clientY };
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!pointerStartRef.current) return;
+    const deltaX = e.clientX - pointerStartRef.current.x;
+    const deltaY = e.clientY - pointerStartRef.current.y;
+
+    if (!isDragging && (Math.abs(deltaX) > 7 || Math.abs(deltaY) > 7)) {
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        setIsDragging(true);
+      } else {
+        pointerStartRef.current = null;
+        return;
+      }
+    }
+
+    if (isDragging) {
+      let effective = deltaX;
+      if (deltaX > 0 && !canSwipeRight) {
+        effective = deltaX * 0.25;
+      } else if (deltaX < 0 && !canSwipeLeft) {
+        effective = deltaX * 0.25;
+      } else {
+        effective = deltaX * 0.85;
+      }
+      setDragOffset(Math.max(-130, Math.min(130, effective)));
+    }
+  };
+
+  const handlePointerUp = async (e: React.PointerEvent) => {
+    if (!pointerStartRef.current) return;
+    pointerStartRef.current = null;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    } catch {}
+
+    if (isDragging) {
+      const currentOffset = dragOffset;
+      setIsDragging(false);
+      const SWIPE_THRESHOLD = 45;
+
+      if (currentOffset < -SWIPE_THRESHOLD && canSwipeLeft) {
+        setIsAnimating(true);
+        setDragOffset(-160);
+        setTimeout(async () => {
+          setDragOffset(80);
+          if (activeIndex < swipes.length - 1) {
+            await handleSwitchSwipe(activeIndex + 1);
+          } else if (isLastAssistant) {
+            await onRegenerateSwipe(message.id);
+          }
+          requestAnimationFrame(() => {
+            setIsAnimating(false);
+            setDragOffset(0);
+          });
+        }, 160);
+      } else if (currentOffset > SWIPE_THRESHOLD && canSwipeRight) {
+        setIsAnimating(true);
+        setDragOffset(160);
+        setTimeout(async () => {
+          setDragOffset(-80);
+          await handleSwitchSwipe(activeIndex - 1);
+          requestAnimationFrame(() => {
+            setIsAnimating(false);
+            setDragOffset(0);
+          });
+        }, 160);
+      } else {
+        setDragOffset(0);
+      }
+    }
+  };
+
   const avatarUrl = isAssistant
     ? character.avatarUrl
     : userPersona?.avatarUrl;
@@ -106,18 +292,29 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
         backdropFilter: bubbleOpacity > 15 ? "blur(10px)" : "none",
       };
 
-  const assistantBubbleStyle: React.CSSProperties = bubbleOpacity === 0
-    ? {
-        backgroundColor: "transparent",
-        borderColor: "transparent",
-        backdropFilter: "none",
-        boxShadow: "none",
-      }
-    : {
-        backgroundColor: `rgba(15, 17, 23, ${(bubbleOpacity / 100) * 0.65})`,
-        borderColor: `rgba(255, 255, 255, ${(bubbleOpacity / 100) * 0.08})`,
-        backdropFilter: bubbleOpacity > 15 ? "blur(10px)" : "none",
-      };
+  const assistantBubbleStyle: React.CSSProperties = {
+    ...(bubbleOpacity === 0
+      ? {
+          backgroundColor: "transparent",
+          borderColor: "transparent",
+          backdropFilter: "none",
+          boxShadow: "none",
+        }
+      : {
+          backgroundColor: `rgba(15, 17, 23, ${(bubbleOpacity / 100) * 0.65})`,
+          borderColor: `rgba(255, 255, 255, ${(bubbleOpacity / 100) * 0.08})`,
+          backdropFilter: bubbleOpacity > 15 ? "blur(10px)" : "none",
+        }),
+    transform: `translateX(${dragOffset}px)`,
+    transition: isDragging
+      ? "none"
+      : isAnimating
+      ? "transform 0.16s ease-in, opacity 0.16s ease-in"
+      : "transform 0.28s cubic-bezier(0.18, 0.9, 0.32, 1.15), opacity 0.2s ease-out",
+    opacity: isAnimating ? 0.35 : 1,
+    willChange: "transform, opacity",
+    touchAction: "pan-y",
+  };
 
   const textContrastClass = bubbleOpacity < 35 ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]" : "";
 
@@ -238,10 +435,58 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
 
       <div
         style={assistantBubbleStyle}
-        className={`group relative flex items-start gap-2 sm:gap-2.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border w-fit max-w-[88%] sm:max-w-[82%] transition-all duration-200 ${
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        className={`group relative flex items-start gap-2 sm:gap-2.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border w-fit max-w-[88%] sm:max-w-[82%] select-none ${
           isSelected ? "ring-2 ring-red-500/80" : ""
-        }`}
+        } ${isDragging ? "cursor-grabbing select-none" : "cursor-grab"}`}
       >
+        {/* Interactive Floating Swipe Pill Indicator */}
+        {Math.abs(dragOffset) > 10 && (
+          <div
+            className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold tracking-wide shadow-2xl backdrop-blur-md pointer-events-none select-none z-30 transition-all duration-150 ${
+              dragOffset < 0
+                ? "left-full ml-3"
+                : "right-full mr-3"
+            } ${
+              Math.abs(dragOffset) >= 45
+                ? "bg-brand-600 text-white shadow-brand-500/50 scale-105 ring-1 ring-brand-400/40"
+                : "bg-dark-900/90 text-slate-300 border border-white/10"
+            }`}
+          >
+            {dragOffset < 0 ? (
+              <>
+                <span>
+                  {Math.abs(dragOffset) >= 45
+                    ? activeIndex < swipes.length - 1
+                      ? "Release for Next"
+                      : "Release to Regenerate"
+                    : activeIndex < swipes.length - 1
+                    ? "Swipe for next"
+                    : "Swipe to regenerate"}
+                </span>
+                {activeIndex < swipes.length - 1 ? (
+                  <ChevronRight className="w-3.5 h-3.5 text-brand-300" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 text-brand-300 animate-pulse" />
+                )}
+              </>
+            ) : (
+              <>
+                <ChevronLeft className="w-3.5 h-3.5 text-brand-300" />
+                <span>
+                  {dragOffset >= 45 ? "Release for Previous" : "Swipe for previous"}
+                </span>
+              </>
+            )}
+          </div>
+        )}
         {/* Compact Avatar */}
         <div className="flex-shrink-0 mt-0.5">
         {avatarUrl ? (
