@@ -96,49 +96,10 @@ export const ChatPage: React.FC = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center min-h-screen bg-dark-950 text-slate-400">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium">Entering conversation...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (isError || !session) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-dark-950 text-slate-300 p-6">
-        <div className="w-12 h-12 rounded-2xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mb-4 text-brand-400">
-          <Bot className="w-6 h-6" />
-        </div>
-        <h2 className="text-xl font-bold text-white mb-2">Connecting to Session...</h2>
-        <p className="text-sm text-slate-400 max-w-sm text-center mb-6">
-          Unable to load conversation or network connection interrupted.
-        </p>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-xs transition-all shadow-lg shadow-brand-500/20"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Retry Connection</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="px-5 py-2.5 rounded-2xl bg-dark-800 hover:bg-dark-700 text-slate-300 font-semibold text-xs border border-white/10 transition-all"
-          >
-            Back to Gallery
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const { character, userPersona, messages = [], memories = [] } = session;
+  const messages = session?.messages || [];
+  const character = session?.character;
+  const userPersona = session?.userPersona;
+  const memories = session?.memories || [];
 
   const handleEditMessage = async (messageId: string, newContent: string) => {
     await editMessage({ id: messageId, content: newContent }).unwrap();
@@ -210,6 +171,7 @@ export const ChatPage: React.FC = () => {
   }, [handlePrevSwipe, handleNextSwipe, isDeleteMode, isProfileDrawerOpen]);
 
   const handlePinMemory = async (content: string, label?: string) => {
+    if (!character?.id || !session?.id) return;
     await pinMemory({
       characterId: character.id,
       sessionId: session.id,
@@ -243,7 +205,7 @@ export const ChatPage: React.FC = () => {
   };
 
   const handleConfirmDeleteMessages = async () => {
-    if (selectedMessageIds.size === 0) return;
+    if (selectedMessageIds.size === 0 || !session?.id) return;
     const count = selectedMessageIds.size;
     const confirmed = window.confirm(`Permanently delete ${count} selected message${count > 1 ? "s" : ""}?`);
     if (!confirmed) return;
@@ -259,6 +221,48 @@ export const ChatPage: React.FC = () => {
       console.error("Failed to delete messages:", err);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-screen bg-dark-950 text-slate-400">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-medium">Entering conversation...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !session || !character) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-dark-950 text-slate-300 p-6">
+        <div className="w-12 h-12 rounded-2xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mb-4 text-brand-400">
+          <Bot className="w-6 h-6" />
+        </div>
+        <h2 className="text-xl font-bold text-white mb-2">Connecting to Session...</h2>
+        <p className="text-sm text-slate-400 max-w-sm text-center mb-6">
+          Unable to load conversation or network connection interrupted.
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-xs transition-all shadow-lg shadow-brand-500/20"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Retry Connection</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="px-5 py-2.5 rounded-2xl bg-dark-800 hover:bg-dark-700 text-slate-300 font-semibold text-xs border border-white/10 transition-all"
+          >
+            Back to Gallery
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex-1 flex flex-col h-full overflow-hidden bg-dark-950">
