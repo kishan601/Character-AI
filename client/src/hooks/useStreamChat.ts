@@ -1,7 +1,6 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { baseApi } from "../api/baseApi.js";
-import { getApiBaseUrl } from "../config";
 import { AppDispatch } from "../store/store.js";
 
 interface UseStreamChatOptions {
@@ -9,12 +8,22 @@ interface UseStreamChatOptions {
   onDone?: () => void;
 }
 
-const getAiConfig = () => ({
-  aiProvider: localStorage.getItem("ai_provider") || "Custom",
-  aiEndpoint: localStorage.getItem("ai_endpoint") || "http://192.168.29.240:1234/v1/chat/completions",
-  aiApiKey: localStorage.getItem("ai_api_key") || "",
-  aiModel: localStorage.getItem("ai_model") || "liquid/lfm2.5-1.2b"
-});
+const getAiConfig = () => {
+  let savedModel = localStorage.getItem("ai_model") || "local-model";
+  // Force purge the bad liquid model from the cache so LM Studio stops auto-loading it
+  if (savedModel === "liquid/lfm2.5-1.2b") {
+    savedModel = "local-model";
+    localStorage.setItem("ai_model", "local-model");
+  }
+
+  return {
+    aiProvider: localStorage.getItem("ai_provider") || "Custom",
+    aiEndpoint: localStorage.getItem("ai_endpoint") || "http://192.168.29.240:1234/v1/chat/completions",
+    aiApiKey: localStorage.getItem("ai_api_key") || "",
+    aiModel: savedModel,
+    aiContextLimit: parseInt(localStorage.getItem("ai_context_limit") || "8192", 10)
+  };
+};
 
 export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -84,7 +93,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
       abortControllerRef.current = controller;
 
       try {
-        const response = await fetch(`${getApiBaseUrl()}/generate`, {
+        const response = await fetch(`/api/generate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -144,20 +153,19 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
                 // Seamless handoff: Commit messages into cache FIRST before clearing streaming state
                 if (data.message) {
                   dispatch(
-                    baseApi.util.updateQueryData("getSession", sessionId, (draft) => {
-                      if (!draft.messages) draft.messages = [];
+                    baseApi.util.updateQueryData("getMessages", { sessionId }, (draft) => {
                       if (data.userMessage) {
-                        const existsUser = draft.messages.some((m) => m.id === data.userMessage.id);
+                        const existsUser = draft.some((m) => m.id === data.userMessage.id);
                         if (!existsUser) {
-                          draft.messages.push(data.userMessage);
+                          draft.push(data.userMessage);
                         }
                       }
-                      const existsAssistant = draft.messages.some((m) => m.id === data.message.id);
+                      const existsAssistant = draft.some((m) => m.id === data.message.id);
                       if (!existsAssistant) {
-                        draft.messages.push(data.message);
+                        draft.push(data.message);
                       } else {
-                        const idx = draft.messages.findIndex((m) => m.id === data.message.id);
-                        draft.messages[idx] = data.message;
+                        const idx = draft.findIndex((m) => m.id === data.message.id);
+                        draft[idx] = data.message;
                       }
                     })
                   );
@@ -212,7 +220,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
       abortControllerRef.current = controller;
 
       try {
-        const response = await fetch(`${getApiBaseUrl()}/generate`, {
+        const response = await fetch(`/api/generate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -260,14 +268,13 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
                 // Seamless handoff: Commit assistant message into cache FIRST
                 if (data.message) {
                   dispatch(
-                    baseApi.util.updateQueryData("getSession", sessionId, (draft) => {
-                      if (!draft.messages) draft.messages = [];
-                      const exists = draft.messages.some((m) => m.id === data.message.id);
+                    baseApi.util.updateQueryData("getMessages", { sessionId }, (draft) => {
+                      const exists = draft.some((m) => m.id === data.message.id);
                       if (!exists) {
-                        draft.messages.push(data.message);
+                        draft.push(data.message);
                       } else {
-                        const idx = draft.messages.findIndex((m) => m.id === data.message.id);
-                        draft.messages[idx] = data.message;
+                        const idx = draft.findIndex((m) => m.id === data.message.id);
+                        draft[idx] = data.message;
                       }
                     })
                   );
@@ -320,7 +327,7 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
       abortControllerRef.current = controller;
 
       try {
-        const response = await fetch(`${getApiBaseUrl()}/generate/regenerate`, {
+        const response = await fetch(`/api/generate/regenerate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -368,12 +375,10 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
                 // Seamless in-place swipe update in cache FIRST
                 if (data.message) {
                   dispatch(
-                    baseApi.util.updateQueryData("getSession", sessionId, (draft) => {
-                      if (draft.messages) {
-                        const idx = draft.messages.findIndex((m) => m.id === data.message.id);
-                        if (idx !== -1) {
-                          draft.messages[idx] = data.message;
-                        }
+                    baseApi.util.updateQueryData("getMessages", { sessionId }, (draft) => {
+                      const idx = draft.findIndex((m) => m.id === data.message.id);
+                      if (idx !== -1) {
+                        draft[idx] = data.message;
                       }
                     })
                   );
@@ -412,6 +417,16 @@ export function useStreamChat({ sessionId, onDone }: UseStreamChatOptions) {
     },
     [sessionId, isStreaming, dispatch, onDone, queueToken, clearTokenBatcher]
   );
+
+  // Automatically abort stream when unmounting (navigating away)
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      clearTokenBatcher();
+    };
+  }, [clearTokenBatcher]);
 
   return {
     isStreaming,

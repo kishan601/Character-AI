@@ -1,5 +1,4 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { getApiBaseUrl } from "../config";
 
 export interface Character {
   id: string;
@@ -85,7 +84,7 @@ export interface LMStudioHealth {
 }
 
 const dynamicBaseQuery = async (args: any, api: any, extraOptions: any) => {
-  const rawBaseQuery = fetchBaseQuery({ baseUrl: getApiBaseUrl() });
+  const rawBaseQuery = fetchBaseQuery({ baseUrl: "/api" });
   return rawBaseQuery(args, api, extraOptions);
 };
 
@@ -244,24 +243,75 @@ export const baseApi = createApi({
     }),
 
     // Messages
-    getMessages: builder.query<Message[], string>({
-      query: (sessionId) => `/messages/session/${sessionId}`,
+    getMessages: builder.query<Message[], { sessionId: string; beforeCursor?: string; limit?: number }>({
+      query: ({ sessionId, beforeCursor, limit }) => {
+        const params = new URLSearchParams();
+        if (beforeCursor) params.append("beforeCursor", beforeCursor);
+        if (limit) params.append("limit", limit.toString());
+        return `/messages/session/${sessionId}?${params.toString()}`;
+      },
+      serializeQueryArgs: ({ queryArgs }) => {
+        return queryArgs.sessionId; // All pages cache under the same sessionId key
+      },
+      merge: (currentCache, newItems, { arg }) => {
+        if (arg.beforeCursor) {
+          // Prepend older messages when fetching history
+          currentCache.unshift(...newItems);
+        } else {
+          // Replace entirely on initial load
+          return newItems;
+        }
+      },
+      forceRefetch({ currentArg, previousArg }) {
+        return currentArg?.beforeCursor !== previousArg?.beforeCursor;
+      },
       providesTags: ["Messages"],
     }),
-    editMessage: builder.mutation<{ message: Message; softDeletedCount: number }, { id: string; content: string }>({
+    editMessage: builder.mutation<{ message: Message; softDeletedCount: number }, { id: string; content: string; sessionId: string }>({
       query: ({ id, content }) => ({
         url: `/messages/${id}`,
         method: "PUT",
         body: { content },
       }),
-      invalidatesTags: ["Messages", "Session"],
+      async onQueryStarted({ id, content, sessionId }, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          baseApi.util.updateQueryData("getMessages", { sessionId }, (draft) => {
+            const message = draft.find((m) => m.id === id);
+            if (message) {
+              if (!message.swipes) message.swipes = [];
+              message.swipes[message.activeSwipeIndex || 0] = content;
+            }
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
+      invalidatesTags: ["Messages"],
     }),
-    switchSwipe: builder.mutation<Message, { id: string; swipeIndex: number }>({
+    switchSwipe: builder.mutation<Message, { id: string; swipeIndex: number; sessionId: string }>({
       query: ({ id, swipeIndex }) => ({
         url: `/messages/${id}/swipe`,
         method: "PATCH",
         body: { swipeIndex },
       }),
+      async onQueryStarted({ id, swipeIndex, sessionId }, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          baseApi.util.updateQueryData("getMessages", { sessionId }, (draft) => {
+            const message = draft.find((m) => m.id === id);
+            if (message && message.swipes && message.swipes[swipeIndex]) {
+              message.activeSwipeIndex = swipeIndex;
+            }
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo();
+        }
+      },
       invalidatesTags: ["Messages"],
     }),
     batchDeleteMessages: builder.mutation<{ success: boolean; count: number }, { messageIds: string[]; sessionId: string }>({
@@ -272,10 +322,8 @@ export const baseApi = createApi({
       }),
       async onQueryStarted({ messageIds, sessionId }, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
-          baseApi.util.updateQueryData("getSession", sessionId, (draft) => {
-            if (draft.messages) {
-              draft.messages = draft.messages.filter((m) => !messageIds.includes(m.id));
-            }
+          baseApi.util.updateQueryData("getMessages", { sessionId }, (draft) => {
+            return draft.filter((m) => !messageIds.includes(m.id));
           })
         );
         try {
@@ -284,7 +332,7 @@ export const baseApi = createApi({
           patchResult.undo();
         }
       },
-      invalidatesTags: ["Messages", "Session"],
+      invalidatesTags: ["Messages"],
     }),
 
     // Memories
@@ -301,14 +349,25 @@ export const baseApi = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Memories", "Session"],
+      invalidatesTags: ["Memories"],
     }),
     unpinMemory: builder.mutation<{ success: boolean }, string>({
       query: (id) => ({
         url: `/memories/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["Memories", "Session"],
+      invalidatesTags: ["Memories"],
+    }),
+    getMemoryStatus: builder.query<{ memoryPressure: number; compactionStatus: string; unsummarizedMessageCount: number }, string>({
+      query: (sessionId) => `/sessions/${sessionId}/memory/status`,
+      providesTags: (result, error, id) => [{ type: "Session", id }],
+    }),
+    compactMemory: builder.mutation<{ status: string }, string>({
+      query: (sessionId) => ({
+        url: `/sessions/${sessionId}/memory/compact`,
+        method: "POST",
+      }),
+      invalidatesTags: (result, error, id) => [{ type: "Session", id }],
     }),
   }),
 });
@@ -338,4 +397,6 @@ export const {
   useGetMemoriesQuery,
   usePinMemoryMutation,
   useUnpinMemoryMutation,
+  useGetMemoryStatusQuery,
+  useCompactMemoryMutation,
 } = baseApi;

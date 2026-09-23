@@ -116,9 +116,12 @@ generationRouter.post("/", async (req, res, next) => {
       );
     }
 
+    const sanitizedUserName = userName.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "User";
     const stopTokens = [
       `\n${userName}:`,
       `\n\n${userName}:`,
+      `\n${sanitizedUserName}:`,
+      `\n\n${sanitizedUserName}:`,
       `\nUser:`,
       `\n\nUser:`,
       `\n{{user}}:`,
@@ -288,6 +291,22 @@ generationRouter.post("/regenerate", async (req, res, next) => {
       preferredMaxTokens: effectiveMaxTokens,
     });
 
+    const userName = session.userPersona?.name || "User";
+    const charName = session.character.name;
+
+    // Detect if this regeneration is targeting a continuation sequence.
+    // If the message immediately preceding this target was also from the assistant,
+    // the LLM prompt will naturally end with an assistant message.
+    // We must re-inject the continuation instruction to prevent immediate termination.
+    const isContinuationRegeneration = contextMessages.length > 0 && contextMessages[contextMessages.length - 1].sender === "assistant";
+    
+    if (isContinuationRegeneration) {
+      compiledMessages.push({
+        role: "user",
+        content: `(Continue the narrative, scene, and actions as ${charName} from the current point. Stay strictly in character and describe the next events, dialogue, and actions. Do not speak or act for ${userName}.)`,
+      });
+    }
+
     // Setup SSE
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -297,8 +316,6 @@ generationRouter.post("/regenerate", async (req, res, next) => {
     const abortController = new AbortController();
     req.on("close", () => abortController.abort());
 
-    const userName = session.userPersona?.name || "User";
-    const charName = session.character.name;
     const currentSwipes = parseSwipes(targetMsg.swipes);
     const previousSwipe = currentSwipes[targetMsg.activeSwipeIndex] || currentSwipes[currentSwipes.length - 1] || "";
 
@@ -355,6 +372,32 @@ generationRouter.post("/regenerate", async (req, res, next) => {
 
     // Append new sanitized swipe
     const cleanedSwipe = sanitizeAssistantResponse(newFullText, userName, charName);
+    
+    // Explicit Empty Generation Handling
+    if (!cleanedSwipe) {
+      logGenerationMetrics({
+        sessionId,
+        characterName: charName,
+        orderIndex: targetMsg.orderIndex,
+        isRegeneration: true,
+        swipeNumber: currentSwipes.length,
+        durationMs,
+        promptLength: compiledMessages.reduce((sum, m) => sum + m.content.length, 0),
+        outputLength: 0,
+        similarityScore: 0,
+        openingActionMatch: false,
+      });
+
+      res.write(
+        `data: ${JSON.stringify({
+          type: "error",
+          error: "EMPTY_GENERATION: The model returned an empty response. The previous swipe has been preserved.",
+        })}\n\n`
+      );
+      res.end();
+      return;
+    }
+
     currentSwipes.push(cleanedSwipe);
     const newActiveIndex = currentSwipes.length - 1;
 

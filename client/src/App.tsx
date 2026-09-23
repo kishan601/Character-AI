@@ -7,6 +7,8 @@ import { HomePage } from "./pages/HomePage.js";
 import { ChatPage } from "./pages/ChatPage.js";
 import { GlobalPersonaModal } from "./components/personas/GlobalPersonaModal.js";
 
+import { ErrorBoundary } from "./components/shared/ErrorBoundary.js";
+
 // Lazy-load secondary administrative & creation pages
 const CharacterCreatePage = React.lazy(() =>
   import("./pages/CharacterCreatePage.js").then((m) => ({ default: m.CharacterCreatePage }))
@@ -44,16 +46,18 @@ export const App: React.FC = () => {
         <div className="flex h-full w-screen overflow-hidden bg-dark-950 text-slate-100 font-sans">
           <Sidebar />
           <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-            <React.Suspense fallback={<PageFallback />}>
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/chat/:sessionId" element={<ChatPage />} />
-                <Route path="/characters/new" element={<CharacterCreatePage />} />
-                <Route path="/characters/:id/edit" element={<CharacterEditPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/settings/ai" element={<AIIntegrationPage />} />
-              </Routes>
-            </React.Suspense>
+            <ErrorBoundary fallbackTitle="SECTOR RUNTIME FAULT DETECTED">
+              <React.Suspense fallback={<PageFallback />}>
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/chat/:sessionId" element={<ChatPage />} />
+                  <Route path="/characters/new" element={<CharacterCreatePage />} />
+                  <Route path="/characters/:id/edit" element={<CharacterEditPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/settings/ai" element={<AIIntegrationPage />} />
+                </Routes>
+              </React.Suspense>
+            </ErrorBoundary>
           </div>
         </div>
         <GlobalPersonaModal />

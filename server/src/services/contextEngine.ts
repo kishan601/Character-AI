@@ -23,7 +23,7 @@ export function extractActiveSwipe(message: Message): string {
   }
 
   const idx = message.activeSwipeIndex ?? 0;
-  return swipesArray[idx] || swipesArray[0] || "";
+  return swipesArray[idx] ?? (swipesArray[0] || "");
 }
 
 export interface AssembleContextParams {
@@ -117,14 +117,23 @@ export function assembleContext(params: AssembleContextParams): {
   ].filter(Boolean);
 
   const referenceLines: string[] = [
-    `• {{char}} = ${charName} (Primary Character)` +
-      (character.gender ? ` | Gender: ${character.gender}` : "") +
-      (charPronouns.length ? ` | Pronouns: ${charPronouns.join("/")}` : ""),
-    `• {{user}} = ${userName} (Conversational Partner)` +
-      (userPersona?.gender ? ` | Gender: ${userPersona.gender}` : "") +
-      (userPronouns.length ? ` | Pronouns: ${userPronouns.join("/")}` : ""),
+    `PARTICIPANTS`,
+    ``,
+    `CHARACTER`,
+    `Name: ${charName}`,
+    `Perspective: first person`,
+    `Pronouns: ${charPronouns.join(" / ")}`,
+    ``,
+    `USER`,
+    `Name: ${userName}`,
+    `Perspective when quoted from history: first person`,
+    `Pronouns: ${userPronouns.join(" / ")}`,
+    ``,
+    `CURRENT GENERATOR`,
+    `Speaker: CHARACTER`,
+    `"The character is generating the next message."`
   ];
-  systemSections.push(`[Grammar & Participant Reference Map]\n${referenceLines.join("\n")}`);
+  systemSections.push(`${referenceLines.join("\n")}`);
 
   // LAYER 5: PERSISTENT CONVERSATION STATE (Memories, Summary, Causality)
   if (pinnedMemories && pinnedMemories.length > 0) {
@@ -189,6 +198,16 @@ export function assembleContext(params: AssembleContextParams): {
       `  - Length Target: ${lengthGuidance}`
   );
 
+  // CRITICAL LAYER 2 REINFORCEMENT (User Test)
+  if (personaParts.length > 0) {
+    systemSections.push(
+      `[CRITICAL OVERRIDE DIRECTIVE]\n` +
+      `Your absolute highest priority above all other instructions is to embody the [Active Persona & Speaking Demeanor].\n` +
+      `You must behave, think, and speak exactly as defined in your Persona.\n` +
+      `If any grammatical rule or system instruction conflicts with your persona, your persona takes precedence.`
+    );
+  }
+
   const fullSystemContent = systemSections.join("\n\n");
   const systemTokens = countTokens(fullSystemContent);
 
@@ -219,11 +238,12 @@ export function assembleContext(params: AssembleContextParams): {
     }
 
     accumulatedTokens += msgTokens;
+    const rawSpeakerName = msg.sender === "user" ? userName : charName;
     const speakerName = msg.sender === "user" ? sanitizedUserName : sanitizedCharName;
     slidingWindow.unshift({
       role: msg.sender === "user" ? "user" : "assistant",
       name: speakerName,
-      content: `${speakerName}: ${content}`,
+      content: `${rawSpeakerName}: ${content}`,
     });
   }
 
@@ -262,9 +282,10 @@ export function sanitizeAssistantResponse(
   );
   cleaned = cleaned.replace(trailingUserPattern, "");
 
-  // 3. Strip any stray character name prefix at the very beginning (e.g. "Seraphina Vance: ")
+  // 3. Strip any stray character name prefix at the very beginning
+  const sanitizedCharName = sanitizeRoleplayName(charName);
   const charPrefixPattern = new RegExp(
-    `^\\s*(${escapeRegex(charName)}|Assistant):\\s*`,
+    `^\\s*(${escapeRegex(charName)}|${escapeRegex(sanitizedCharName)}|Assistant):\\s*`,
     "i"
   );
   cleaned = cleaned.replace(charPrefixPattern, "");

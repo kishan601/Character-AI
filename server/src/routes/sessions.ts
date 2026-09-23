@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { interpolateMacros } from "../services/contextEngine.js";
 import { serializeSwipes } from "./messages.js";
+import { memoryService } from "../services/memory.js";
 
 export const sessionsRouter = Router();
 
@@ -37,10 +38,7 @@ sessionsRouter.get("/:id", async (req, res, next) => {
         character: true,
         userPersona: true,
         memories: { orderBy: { createdAt: "desc" } },
-        messages: {
-          where: { isDeleted: false },
-          orderBy: { orderIndex: "asc" },
-        },
+        _count: { select: { messages: { where: { isDeleted: false } } } },
       },
     });
 
@@ -318,6 +316,26 @@ sessionsRouter.delete("/character/:characterId", async (req, res, next) => {
     });
   } catch (err) {
     console.error("Failed to delete sessions for character:", err);
+    next(err);
+  }
+});
+
+// GET session memory status
+sessionsRouter.get("/:id/memory/status", async (req, res, next) => {
+  try {
+    const status = await memoryService.getStatus(req.params.id);
+    res.json(status);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST trigger memory compaction
+sessionsRouter.post("/:id/memory/compact", async (req, res, next) => {
+  try {
+    const result = await memoryService.compact(req.params.id, { force: true });
+    res.json(result);
+  } catch (err) {
     next(err);
   }
 });

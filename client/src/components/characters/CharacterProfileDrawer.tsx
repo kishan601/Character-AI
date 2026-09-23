@@ -155,11 +155,7 @@ export const CharacterProfileDrawer: React.FC<CharacterProfileDrawerProps> = ({
               {character.tagline && (
                 <p className="text-xs font-medium text-brand-300 mt-0.5">{character.tagline}</p>
               )}
-              {character.description && (
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed max-w-xs">
-                  {character.description}
-                </p>
-              )}
+
             </div>
           </div>
 

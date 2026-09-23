@@ -94,9 +94,6 @@ export const CharacterCard: React.FC<CharacterCardProps> = React.memo(({ charact
           </p>
         )}
 
-        <p className="text-xs text-slate-400 mt-2 line-clamp-2 leading-relaxed flex-1">
-          {character.description || character.greeting.replace(/\*/g, "")}
-        </p>
 
         <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-500">
           <span>{character._count?.sessions || 0} chats</span>
